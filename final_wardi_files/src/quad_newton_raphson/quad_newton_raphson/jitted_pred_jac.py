@@ -51,8 +51,6 @@ def compute_jacobian(state, last_input, T_lookahead, g, m, C, integration_step):
     jac_fn = jacfwd(lambda x: predict_outputs(state, x, T_lookahead, g, m, C, integration_step))
     return jac_fn(last_input)
 
-
-
 # Compute adjusted inverse Jacobian
 @jit
 def compute_adjusted_invjac(state, last_input, T_lookahead, g, m, C, integration_step):
@@ -60,4 +58,3 @@ def compute_adjusted_invjac(state, last_input, T_lookahead, g, m, C, integration
     inv_jacobian = jnp.linalg.pinv(jac)
     inv_jacobian_modified = inv_jacobian.at[:, 2].set(-inv_jacobian[:, 2])
     return inv_jacobian_modified
-    # return jac

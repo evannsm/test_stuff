@@ -50,7 +50,8 @@ class OffboardControl(Node):
         self.mpc_timel_array = []
 
 
-        self.pyjoules_on = False
+        self.mode_channel = 5
+        self.pyjoules_on = int(input("Use PyJoules? 1 for Yes 0 for No: ")) #False
         if self.pyjoules_on:
             self.csv_handler = CSVHandler('mpc_cpu_energy_TESTERRORS.csv')
 ###############################################################################################################################################
@@ -96,7 +97,7 @@ class OffboardControl(Node):
 ###############################################################################################################################################
 
         # Initialize variables:  
-        self.time_before_land = 10.0
+        self.time_before_land = 30.0
         print(f"time_before_land: {self.time_before_land}")
         self.offboard_setpoint_counter = 0 #helps us count 10 cycles of sending offboard heartbeat before switching to offboard mode and arming
         self.vehicle_status = VehicleStatus() #vehicle status variable to make sure we're in offboard mode before sending setpoints
@@ -378,49 +379,38 @@ class OffboardControl(Node):
 
     def normalize_angle(self, angle):
         """ Normalize the angle to the range [-pi, pi]. """
-        result = m.atan2(m.sin(angle), m.cos(angle))
-        # print(f"normalize_angle: input={angle}, result={result}")
-        return result
+        return m.atan2(m.sin(angle), m.cos(angle))
 
-    def new_angle_wrapper(self, angle):
-        """Wrap the angle to the range [-pi, pi]."""
-        # angle_adj = angle + m.pi
-        # normalized = self.normalize_angle(angle_adj)
-        # result = -1 * normalized
-        # print(f"new_angle_wrapper: input={angle}, normalized={normalized}, result={result}")
-        return -1 * self.normalize_angle(angle + m.pi)
+    def quaternion_to_euler_ned(self, quaternion):
+        q0, q1, q2, q3 = quaternion
+        roll = np.arctan2(2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1**2 + q2**2)) # Compute roll (phi)
+        pitch = np.arcsin(-2 * (q1 * q3 - q0 * q2)) # Compute pitch (theta)
+        yaw = np.arctan2(2 * (q0 * q3 + q1 * q2), 1 - 2 * (q2**2 + q3**2)) # Compute yaw (psi)
 
+        return roll, pitch, yaw  
+    
     def vehicle_odometry_callback(self, msg): # Odometry Callback Function Yields Position, Velocity, and Attitude Data
         """Callback function for vehicle_odometry topic subscriber."""
-        # print("AT ODOM CALLBACK")
-        (self.yaw, self.pitch, self.roll) = self.euler_from_quaternion(msg.q)
-        # print("not yaw:")
-        # not_yaw = self.new_angle_wrapper(self.yaw)
-        # print("\nyaw: ")
-        # self.yaw = self.old_angle_wrapper(self.yaw)
+        # print('vehicle odometry callback')
 
-        self.yaw = self.new_angle_wrapper(self.yaw)
-        self.pitch = -1 * self.pitch # pitch is negative of the value in gazebo bc of frame difference
+        self.x = msg.position[0]
+        self.y = msg.position[1]
+        self.z = msg.position[2]
+
+        self.vx = msg.velocity[0]
+        self.vy = msg.velocity[1]
+        self.vz = msg.velocity[2]
+
+        self.roll, self.pitch, self.yaw = self.quaternion_to_euler_ned(msg.q)
 
         self.p = msg.angular_velocity[0]
         self.q = msg.angular_velocity[1]
         self.r = msg.angular_velocity[2]
 
-        self.x = msg.position[0]
-        self.y = msg.position[1]
-        self.z = 1 * msg.position[2] # z is negative of the value in gazebo bc of frame difference
-
-        self.vx = msg.velocity[0]
-        self.vy = msg.velocity[1]
-        self.vz = 1 * msg.velocity[2] # vz is negative of the value in gazebo bc of frame difference
-
-        # print(f"Roll: {self.roll}")
-        # print(f"Pitch: {self.pitch}")
-        # print(f"Yaw: {self.yaw}")
-        
-        self.stateVector = np.array([[self.x, self.y, self.z, self.vx, self.vy, self.vz, self.roll, self.pitch, self.yaw]]).T 
+        self.state_vector = np.array([[self.x, self.y, self.z, self.vx, self.vy, self.vz, self.roll, self.pitch, self.yaw]]).T 
         self.nr_state = np.array([[self.x, self.y, self.z, self.yaw]]).T
-        # self.odom_rates = np.array([[self.p, self.q, self.r]]).T
+        # print(f"State Vector: {self.state_vector}")
+        # print(f"NR State: {self.nr_state}")
 
     def publish_rates_setpoint(self, thrust: float, roll: float, pitch: float, yaw: float): #Publishes Body Rate and Thrust Setpoints
         """Publish the trajectory setpoint."""
@@ -508,7 +498,7 @@ class OffboardControl(Node):
             print(f"--------------------------------------")
             print("\n\n")
         else:
-            print("Controller Callback: Channel 11 Switch Not Set to Offboard")
+            print(f"Controller Callback: RC Flight Mode Channel {self.mode_channel} Switch Not Set to Offboard (-1: position, 0: offboard, 1: land) ")
 
     
 # ~~ From here down are the functions that actually calculate the control input ~~
@@ -524,26 +514,36 @@ class OffboardControl(Node):
 
 
 #~~~~~~~~~~~~~~~ Calculate reference trajectory ~~~~~~~~~~~~~~~
-        if self.time_from_start <= 10.0:
-            reffunc = self.hover_ref_func(1)
-        else:
-            reffunc = self.circle_horz_ref_func()
-            reffunc = self.circle_horz_spin_ref_func()
-            reffunc = self.circle_vert_ref_func()
-            reffunc = self.fig8_horz_ref_func()
-            reffunc = self.fig8_vert_ref_func_short()
-            reffunc = self.fig8_vert_ref_func_tall()
-            reffunc = self.helix()
-            reffunc = self.helix_spin
+        # if self.time_from_start <= 10.0:
+        #     reffunc = self.hover_ref_func(1)
+        # else:
+        #     reffunc = self.circle_horz_ref_func()
+        #     reffunc = self.circle_horz_spin_ref_func()
+        #     reffunc = self.circle_vert_ref_func()
+        #     reffunc = self.fig8_horz_ref_func()
+        #     reffunc = self.fig8_vert_ref_func_short()
+        #     reffunc = self.fig8_vert_ref_func_tall()
+        #     reffunc = self.helix()
+        #     reffunc = self.helix_spin
 
-        reffunc = self.hover_ref_func(1)
-        print(f"reffunc: {reffunc}")
+        # reffunc = self.yawing_only()
+        # reffunc = self.hover_ref_func(1)
+        reffunc = self.circle_horz_ref_func()
+        # reffunc = self.circle_horz_spin_ref_func()
+        # reffunc = self.circle_vert_ref_func()
+        # reffunc = self.fig8_horz_ref_func()
+        # reffunc = self.fig8_vert_ref_func_short()
+        # reffunc = self.fig8_vert_ref_func_tall()
+        # reffunc = self.helix()
+        # reffunc = self.helix_spin()
+        print(f"reffunc: {reffunc[:,0]}")
 
         # Calculate the MPC control input and transform the force into a throttle command for publishing to the vehicle
         new_u = self.get_new_control_input(reffunc)
+        print(f"new_u: {new_u}")
         new_force = -new_u[0]       
-        print(f"new_force: {new_force}")
-
+        # print(f"new_force: {new_force}")
+        # exit(0)
         new_throttle = self.get_throttle_command_from_force(new_force)
         new_roll_rate = new_u[1]
         new_pitch_rate = new_u[2]
@@ -561,7 +561,7 @@ class OffboardControl(Node):
         self.publish_rates_setpoint(final[0], final[1], final[2], final[3])
 
         # Log the states, inputs, and reference trajectories for data analysis
-        state_input_ref_log_info = [float(self.x), float(self.y), float(self.z), float(self.yaw), float(final[0]), float(final[1]), float(final[2]), float(final[3]), float(reffunc[0][0]), float(reffunc[1][0]), float(reffunc[2][0]), float(reffunc[3][0]), self.time_from_start]
+        state_input_ref_log_info = [float(self.x), float(self.y), float(self.z), float(self.yaw), float(final[0]), float(final[1]), float(final[2]), float(final[3]), float(reffunc[0][0]), float(reffunc[1][0]), float(reffunc[2][0]), float(reffunc[-1][0]), self.time_from_start]
         self.update_logged_data(state_input_ref_log_info)
         # self.state_input_ref_log_msg.data = [float(self.x), float(self.y), float(self.z), float(self.yaw), float(final[0]), float(final[1]), float(final[2]), float(final[3]), float(reffunc[0][0]), float(reffunc[1][0]), float(reffunc[2][0]), float(reffunc[3][0])]
         # self.state_input_ref_log_publisher_.publish(self.state_input_ref_log_msg)
@@ -607,7 +607,7 @@ class OffboardControl(Node):
         
     def execute_control_input(self, reffunc):
         t0 = time.time()
-        status, x_mpc, u_mpc = self.mpc_solver.solve_mpc_control(self.stateVector.flatten(), reffunc)
+        status, x_mpc, u_mpc = self.mpc_solver.solve_mpc_control(self.state_vector.flatten(), reffunc)
         mpc_timel = time.time() - t0
         print(f"Outside Acados Timel: {mpc_timel}sec, Good Enough for {1/mpc_timel}Hz")
         self.mpc_timel_array.append(mpc_timel)
@@ -650,7 +650,7 @@ class OffboardControl(Node):
         print("circle_horz_ref_func")
 
         t = self.time_from_start + self.T_lookahead
-        PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
+        PERIOD = 13 # if you make it 30s itll track well but it can't go much faster. used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
         w = 2*m.pi / PERIOD
 
         x = .6*m.cos(w*t)
@@ -678,7 +678,7 @@ class OffboardControl(Node):
         w = 2*m.pi / PERIOD
 
         SPIN_PERIOD = 15
-
+        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD / (2*m.pi)) )
         x = .6*m.cos(w*t)
         y = .6*m.sin(w*t)
         z = -0.8
@@ -687,7 +687,7 @@ class OffboardControl(Node):
         vz = 0.0
         roll = 0.0
         pitch = 0.0
-        yaw = t / (SPIN_PERIOD / (2*m.pi))
+        yaw = yaw_ref
 
         r = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
         r_final = np.tile(r, (1, self.num_steps))
@@ -828,6 +828,7 @@ class OffboardControl(Node):
         height_variance = 0.3
 
         SPIN_PERIOD = 15
+        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD / (2*m.pi)) )
 
         x = .6*m.cos(w*t)
         y = .6*m.sin(w*t)
@@ -837,9 +838,22 @@ class OffboardControl(Node):
         vz = 0.0
         roll = 0.0
         pitch = 0.0
-        yaw = t / (SPIN_PERIOD / (2*m.pi))
+        yaw = yaw_ref
 
         r = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
+        r_final = np.tile(r, (1, self.num_steps))
+
+        return r_final
+    
+    def yawing_only(self): #Returns Yawing Reference Trajectory ([x,y,z,yaw])
+        """ Returns yawing reference trajectory. """
+        print(f"yawing_only")
+        t = self.time_from_start + self.T_lookahead
+
+        SPIN_PERIOD = 7
+        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD / (2*m.pi)) )
+
+        r = np.array([[0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, yaw_ref]]).T
         r_final = np.tile(r, (1, self.num_steps))
 
         return r_final

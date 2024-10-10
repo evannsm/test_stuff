@@ -62,6 +62,7 @@ class OffboardControl(Node):
         self.nr_timel_array = []
         self.pred_timel_array = []
 
+        self.mode_channel = 5
         self.pyjoules_on = False
         if self.pyjoules_on:
             self.csv_handler = CSVHandler('nr_nonlin_cpu_energy_TESTERR.csv')
@@ -110,7 +111,7 @@ class OffboardControl(Node):
 ###############################################################################################################################################
 
         # Initialize variables:
-        self.time_before_land = 12.0
+        self.time_before_land = 30.0
         print(f"time_before_land: {self.time_before_land}")
         self.offboard_setpoint_counter = 0 #helps us count 10 cycles of sending offboard heartbeat before switching to offboard mode and arming
         self.vehicle_status = VehicleStatus() #vehicle status variable to make sure we're in offboard mode before sending setpoints
@@ -146,14 +147,14 @@ class OffboardControl(Node):
         self.pred_type = int(input("JaxNonlin, Neural Network, Linear, or C-CompiledNonlin -based Predictor? Write 3 for Jax, 2 for NN, 1 for Linear and 0 for Nonlinear: "))
         print(f"Predictor #{self.pred_type}: Using {'Jax' if self.pred_type == 3 else 'NN' if self.pred_type == 2 else 'Linear' if self.pred_type == 1 else 'Nonlinear'} Predictor")
 
+        self.C = self.observer_matrix() #Calculate Observer Matrix Needed After Predictions of all States to Get Only the States We Need in Output
+
         self.nonlin0 = None
         if self.pred_type == 0: #Nonlinear Predictor
-            self.nonlin0 = bool(int(input("Press 0 for 0-Order Hold and 1 for 1st-Order Hold: ")))
+            self.nonlin0 = not bool(int(input("Press 0 for 0-Order Hold and 1 for 1st-Order Hold: ")))
 
         if self.pred_type == 0: #Nonlinear Predictor
             # print("Using Nonlinear Predictor")
-            self.C = self.observer_matrix() #Calculate Observer Matrix Needed After Predictions of all States to Get Only the States We Need in Output
-
             class Vector9x1(ctypes.Structure):
                 _fields_ = [
                     ('x', ctypes.c_double),
@@ -166,8 +167,6 @@ class OffboardControl(Node):
                     ('pitch', ctypes.c_double),
                     ('yaw', ctypes.c_double),
                 ]
-
-            # self.nonlin0 = True
 
             if self.nonlin0:
                 print("Using 0-Order Hold Predictor")
@@ -199,7 +198,6 @@ class OffboardControl(Node):
 
         if self.pred_type == 1: #Linear Predictor
             # print("Using Linear Predictor")
-            self.C = self.observer_matrix() #Calculate Observer Matrix Needed After Predictions of all States to Get Only the States We Need in Output
             self.linearized_model() #Calculate Linearized Model Matrices      
             # print(f"{self.jac_inv=}")   
             """
@@ -309,7 +307,7 @@ class OffboardControl(Node):
     def rc_channel_callback(self, rc_channels):
         """Callback function for RC Channels to create a software 'killswitch' depending on our flight mode channel (position vs offboard vs land mode)"""
         print('rc channel callback')
-        self.mode_channel = 5
+        # self.mode_channel = 5
         flight_mode = rc_channels.channels[self.mode_channel-1] # +1 is offboard everything else is not offboard
         self.offboard_mode_rc_switch_on = True if flight_mode >= 0.75 else False
 
@@ -336,115 +334,6 @@ class OffboardControl(Node):
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_control_mode_publisher.publish(msg)
 
-    def euler_from_matrix(self, matrix, axes='sxyz'):
-        """Return Euler angles from rotation matrix for specified axis sequence.
-
-        axes : One of 24 axis sequences as string or encoded tuple
-
-        Note that many Euler angle triplets can describe one matrix.
-
-        # >>> R0 = euler_matrix(1, 2, 3, 'syxz')
-        # >>> al, be, ga = euler_from_matrix(R0, 'syxz')
-        # >>> R1 = euler_matrix(al, be, ga, 'syxz')
-        # >>> numpy.allclose(R0, R1)
-        # True
-        # >>> angles = (4.0*math.pi) * (numpy.random.random(3) - 0.5)
-        # >>> for axes in _AXES2TUPLE.keys():
-        # ...    R0 = euler_matrix(axes=axes, *angles)
-        # ...    R1 = euler_matrix(axes=axes, *euler_from_matrix(R0, axes))
-        # ...    if not numpy.allclose(R0, R1): print axes, "failed"
-
-        # """
-
-        # epsilon for testing whether a number is close to zero
-        _EPS = np.finfo(float).eps * 4.0
-
-        # axis sequences for Euler angles
-        _NEXT_AXIS = [1, 2, 0, 1]
-
-        # map axes strings to/from tuples of inner axis, parity, repetition, frame
-        _AXES2TUPLE = {
-            'sxyz': (0, 0, 0, 0), 'sxyx': (0, 0, 1, 0), 'sxzy': (0, 1, 0, 0),
-            'sxzx': (0, 1, 1, 0), 'syzx': (1, 0, 0, 0), 'syzy': (1, 0, 1, 0),
-            'syxz': (1, 1, 0, 0), 'syxy': (1, 1, 1, 0), 'szxy': (2, 0, 0, 0),
-            'szxz': (2, 0, 1, 0), 'szyx': (2, 1, 0, 0), 'szyz': (2, 1, 1, 0),
-            'rzyx': (0, 0, 0, 1), 'rxyx': (0, 0, 1, 1), 'ryzx': (0, 1, 0, 1),
-            'rxzx': (0, 1, 1, 1), 'rxzy': (1, 0, 0, 1), 'ryzy': (1, 0, 1, 1),
-            'rzxy': (1, 1, 0, 1), 'ryxy': (1, 1, 1, 1), 'ryxz': (2, 0, 0, 1),
-            'rzxz': (2, 0, 1, 1), 'rxyz': (2, 1, 0, 1), 'rzyz': (2, 1, 1, 1)}
-
-        _TUPLE2AXES = dict((v, k) for k, v in _AXES2TUPLE.items())
-
-        try:
-            firstaxis, parity, repetition, frame = _AXES2TUPLE[axes.lower()]
-        except (AttributeError, KeyError):
-            _ = _TUPLE2AXES[axes]
-            firstaxis, parity, repetition, frame = axes
-
-        i = firstaxis
-        j = _NEXT_AXIS[i+parity]
-        k = _NEXT_AXIS[i-parity+1]
-
-        M = np.array(matrix, dtype=np.float64, copy=False)[:3, :3]
-        if repetition:
-            sy = m.sqrt(M[i, j]*M[i, j] + M[i, k]*M[i, k])
-            if sy > _EPS:
-                ax = m.atan2( M[i, j],  M[i, k])
-                ay = m.atan2( sy,       M[i, i])
-                az = m.atan2( M[j, i], -M[k, i])
-            else:
-                ax = m.atan2(-M[j, k],  M[j, j])
-                ay = m.atan2( sy,       M[i, i])
-                az = 0.0
-        else:
-            cy = m.sqrt(M[i, i]*M[i, i] + M[j, i]*M[j, i])
-            if cy > _EPS:
-                ax = m.atan2( M[k, j],  M[k, k])
-                ay = m.atan2(-M[k, i],  cy)
-                az = m.atan2( M[j, i],  M[i, i])
-            else:
-                ax = m.atan2(-M[j, k],  M[j, j])
-                ay = m.atan2(-M[k, i],  cy)
-                az = 0.0
-
-        if parity:
-            ax, ay, az = -ax, -ay, -az
-        if frame:
-            ax, az = az, ax
-        return ax, ay, az
-
-    def quaternion_matrix(self, quaternion):
-        """Return homogeneous rotation matrix from quaternion.
-
-        >>> R = quaternion_matrix([0.06146124, 0, 0, 0.99810947])
-        >>> numpy.allclose(R, rotation_matrix(0.123, (1, 0, 0)))
-        True
-
-        """
-        _EPS = np.finfo(float).eps * 4.0
-
-        q = np.array(quaternion[:4], dtype=np.float64, copy=True)
-        nq = np.dot(q, q)
-        if nq < _EPS:
-            return np.identity(4)
-        q *= m.sqrt(2.0 / nq)
-        q = np.outer(q, q)
-        return np.array((
-            (1.0-q[1, 1]-q[2, 2],     q[0, 1]-q[2, 3],     q[0, 2]+q[1, 3], 0.0),
-            (    q[0, 1]+q[2, 3], 1.0-q[0, 0]-q[2, 2],     q[1, 2]-q[0, 3], 0.0),
-            (    q[0, 2]-q[1, 3],     q[1, 2]+q[0, 3], 1.0-q[0, 0]-q[1, 1], 0.0),
-            (                0.0,                 0.0,                 0.0, 1.0)
-            ), dtype=np.float64)
-
-    def euler_from_quaternion(self, quaternion, axes='sxyz'):
-        """Return Euler angles from quaternion for specified axis sequence.
-
-        >>> angles = euler_from_quaternion([0.06146124, 0, 0, 0.99810947])
-        >>> numpy.allclose(angles, [0.123, 0, 0])
-        True
-
-        """
-        return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
 
 # ~~ The remaining functions are all intimately related to the Newton-Rapshon Control Algorithm ~~
     # The following 2 functions are used to convert between force and throttle commands
@@ -486,49 +375,38 @@ class OffboardControl(Node):
     
     def normalize_angle(self, angle):
         """ Normalize the angle to the range [-pi, pi]. """
-        result = m.atan2(m.sin(angle), m.cos(angle))
-        # print(f"normalize_angle: input={angle}, result={result}")
-        return result
+        return m.atan2(m.sin(angle), m.cos(angle))
 
-    def new_angle_wrapper(self, angle):
-        """Wrap the angle to the range [-pi, pi]."""
-        # angle_adj = angle + m.pi
-        # normalized = self.normalize_angle(angle_adj)
-        # result = -1 * normalized
-        # print(f"new_angle_wrapper: input={angle}, normalized={normalized}, result={result}")
-        return -1 * self.normalize_angle(angle + m.pi)
+    def quaternion_to_euler_ned(self, quaternion):
+        q0, q1, q2, q3 = quaternion
+        roll = np.arctan2(2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1**2 + q2**2)) # Compute roll (phi)
+        pitch = np.arcsin(-2 * (q1 * q3 - q0 * q2)) # Compute pitch (theta)
+        yaw = np.arctan2(2 * (q0 * q3 + q1 * q2), 1 - 2 * (q2**2 + q3**2)) # Compute yaw (psi)
+
+        return roll, pitch, yaw   
 
     def vehicle_odometry_callback(self, msg): # Odometry Callback Function Yields Position, Velocity, and Attitude Data
         """Callback function for vehicle_odometry topic subscriber."""
-        # print("AT ODOM CALLBACK")
-        (self.yaw, self.pitch, self.roll) = self.euler_from_quaternion(msg.q)
-        # print("not yaw:")
-        # not_yaw = self.new_angle_wrapper(self.yaw)
-        # print("\nyaw: ")
-        # self.yaw = self.old_angle_wrapper(self.yaw)
+        # print('vehicle odometry callback')
 
-        self.yaw = self.new_angle_wrapper(self.yaw)
-        self.pitch = -1 * self.pitch #pitch is negative of the value in gazebo bc of frame difference
+        self.x = msg.position[0]
+        self.y = msg.position[1]
+        self.z = msg.position[2]
+
+        self.vx = msg.velocity[0]
+        self.vy = msg.velocity[1]
+        self.vz = msg.velocity[2]
+
+        self.roll, self.pitch, self.yaw = self.quaternion_to_euler_ned(msg.q)
 
         self.p = msg.angular_velocity[0]
         self.q = msg.angular_velocity[1]
         self.r = msg.angular_velocity[2]
 
-        self.x = msg.position[0]
-        self.y = msg.position[1]
-        self.z = 1 * msg.position[2] # z is negative of the value in gazebo bc of frame difference
-
-        self.vx = msg.velocity[0]
-        self.vy = msg.velocity[1]
-        self.vz = 1 * msg.velocity[2] # vz is negative of the value in gazebo bc of frame difference
-
-        # print(f"Roll: {self.roll}")
-        # print(f"Pitch: {self.pitch}")
-        # print(f"Yaw: {self.yaw}")
-        
         self.state_vector = np.array([[self.x, self.y, self.z, self.vx, self.vy, self.vz, self.roll, self.pitch, self.yaw]]).T 
         self.nr_state = np.array([[self.x, self.y, self.z, self.yaw]]).T
-        # self.odom_rates = np.array([[self.p, self.q, self.r]]).T
+        # print(f"State Vector: {self.state_vector}")
+        # print(f"NR State: {self.nr_state}")
 
     def publish_rates_setpoint(self, thrust: float, roll: float, pitch: float, yaw: float): #Publishes Body Rate and Thrust Setpoints
         """Publish the trajectory setpoint."""
@@ -615,8 +493,7 @@ class OffboardControl(Node):
             print(f"--------------------------------------")
             print("\n\n")
         else:
-            print("NR_Callback: Channel 11 Switch Not Set to Offboard")
-
+            print(f"NR Callback: RC Flight Mode Channel {self.mode_channel} Switch Not Set to Offboard (-1: position, 0: offboard, 1: land) ")
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~ From here down are the functions that actually calculate the control input ~~
@@ -629,29 +506,37 @@ class OffboardControl(Node):
             print("First Iteration")
             self.T0 = time.time()
             self.first_iteration = False
-        # else:
-        #     print(helo)
+
         self.time_from_start = time.time()-self.T0
-        self.C = self.observer_matrix() #Calculate Observer Matrix Needed After Predictions of all States to Get Only the States We Need in Output
+
         # Change the previous input from throttle to force for NR calculations that require the previous input
         old_throttle = self.u0[0][0]
         old_force = self.get_force_from_throttle_command(old_throttle)
         last_input_using_force = np.vstack([old_force, self.u0[1:]])
 
 #~~~~~~~~~~~~~~~ Calculate reference trajectory ~~~~~~~~~~~~~~~
-        if self.time_from_start <= 10.0:
-            reffunc = self.hover_ref_func(1)
-        else:
-            reffunc = self.circle_horz_ref_func()
-            reffunc = self.circle_horz_spin_ref_func()
-            reffunc = self.circle_vert_ref_func()
-            reffunc = self.fig8_horz_ref_func()
-            reffunc = self.fig8_vert_ref_func_short()
-            reffunc = self.fig8_vert_ref_func_tall()
-            reffunc = self.helix()
-            reffunc = self.helix_spin
+        # if self.time_from_start <= 10.0:
+        #     reffunc = self.hover_ref_func(1)
+        # else:
+        #     reffunc = self.circle_horz_ref_func()
+        #     reffunc = self.circle_horz_spin_ref_func()
+        #     reffunc = self.circle_vert_ref_func()
+        #     reffunc = self.fig8_horz_ref_func()
+        #     reffunc = self.fig8_vert_ref_func_short()
+        #     reffunc = self.fig8_vert_ref_func_tall()
+        #     reffunc = self.helix()
+        #     reffunc = self.helix_spin()
 
-        reffunc = self.hover_ref_func(1)
+        # reffunc = self.yawing_only()
+        # reffunc = self.hover_ref_func(1)
+        reffunc = self.circle_horz_ref_func()
+        # reffunc = self.circle_horz_spin_ref_func()
+        # reffunc = self.circle_vert_ref_func()
+        # reffunc = self.fig8_horz_ref_func()
+        # reffunc = self.fig8_vert_ref_func_short()
+        # reffunc = self.fig8_vert_ref_func_tall()
+        # reffunc = self.helix()
+        # reffunc = self.helix_spin()
         print(f"reffunc: {reffunc}")
 
         # Calculate the Newton-Rapshon control input and transform the force into a throttle command for publishing to the vehicle
@@ -684,7 +569,7 @@ class OffboardControl(Node):
 
 # ~~ The following functions handle the log update and data retrieval for analysis ~~
     def update_logged_data(self, data):
-        # print("Updating Logged Data")
+        print("Updating Logged Data")
         self.x_log.append(data[0])
         self.y_log.append(data[1])
         self.z_log.append(data[2])
@@ -782,6 +667,8 @@ class OffboardControl(Node):
         return delta_yaw
     
     def get_tracking_error(self, reffunc, pred):
+        print(f"reffunc: {reffunc}")
+        print(f"pred: {pred}")
         err = reffunc - pred
         # # current_yaw = pred[3][0] # current yaw angle
         # # desired_yaw = reffunc[3][0] # desired yaw angle
@@ -804,7 +691,6 @@ class OffboardControl(Node):
         elif self.pred_type == 2:
             print(f"Getting NN Prediction")
             pred = self.get_nn_predict(last_input)
-
         elif self.pred_type == 3:
             print(f"Getting Jax Prediction")
             pred = self.get_jax_predict(last_input)
@@ -1522,8 +1408,9 @@ class OffboardControl(Node):
         PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
         w = 2*m.pi / PERIOD
 
-        SPIN_PERIOD = 15
-        r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -0.8, t / (SPIN_PERIOD/(2*np.pi)) ]]).T
+        SPIN_PERIOD = 10
+        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
+        r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -0.8, yaw_ref ]]).T
 
         return r
     
@@ -1571,7 +1458,9 @@ class OffboardControl(Node):
 
         return r
 
-    def helix(self): #Returns Spiral Staircase Reference Trajectories ([x,y,z,yaw])
+    def helix(self): #Returns Helix Reference Trajectory ([x,y,z,yaw])
+        """ Returns helix reference trajectory. """
+        print(f"helix")
         t = self.time_from_start + self.T_LOOKAHEAD
         PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
         w = 2*m.pi / PERIOD
@@ -1581,8 +1470,11 @@ class OffboardControl(Node):
         z0 = 0.7
         height_variance = 0.3
         r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -1*(z0 + height_variance * m.sin(w_z * t)), 0.0]]).T
+        return r
 
     def helix_spin(self): #Returns Spiral Staircase Reference Trajectories while Spinning ([x,y,z,yaw])
+        """ Returns helix reference trajectory while yawing. """
+        print(f"helix_spin")
         t = self.time_from_start + self.T_LOOKAHEAD
         PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
         w = 2*m.pi / PERIOD
@@ -1593,8 +1485,19 @@ class OffboardControl(Node):
         height_variance = 0.3
 
         SPIN_PERIOD = 15
-        r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -1*(z0 + height_variance * m.sin(w_z * t)), t / (SPIN_PERIOD/(2*np.pi))]]).T
+        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
+        r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -1*(z0 + height_variance * m.sin(w_z * t)), yaw_ref]]).T
+        return r
+    
+    def yawing_only(self): #Returns Yawing Reference Trajectory ([x,y,z,yaw])
+        """ Returns yawing reference trajectory. """
+        print(f"yawing_only")
 
+        t = self.time_from_start + self.T_LOOKAHEAD
+        SPIN_PERIOD = 7
+        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
+        r = np.array([[0., 0., -0.5, yaw_ref]]).T
+        return r
     
     def helix_old(self, num): #Returns Spiral Staircase Reference Trajectories ([x,y,z,yaw])
         """ Returns spiral staircase reference trajectories. """

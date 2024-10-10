@@ -4,7 +4,7 @@ class Quadrotor:
     def __init__(self, sim: bool):
         self.sim = sim
         self.g = 9.806 #gravity
-        self.m = 1.535 if sim else 2.1 #hardware mass could be up to 2.19kg
+        self.m = 1.5 if sim else 1.69 #hardware mass could be up to 2.19kg
 
     def dynamics(self):
         #states

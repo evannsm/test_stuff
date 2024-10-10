@@ -29,22 +29,23 @@ class Logger:
                             'pred_time', 'nr_time', 'metadata'
                             ])
             
-            time_history = ControlNode.get_ctrl_loop_time_log()
-            x_history = ControlNode.get_x_log()
-            y_history = ControlNode.get_y_log()
-            z_history = ControlNode.get_z_log()
-            yaw_history = ControlNode.get_yaw_log()
-            throttle_history = ControlNode.get_throttle_log()
-            roll_history = ControlNode.get_roll_log()
-            pitch_history = ControlNode.get_pitch_log()
-            yaw_rate_history = ControlNode.get_yaw_rate_log()
-            ref_x_history = ControlNode.get_ref_x_log()
-            ref_y_history = ControlNode.get_ref_y_log()
-            ref_z_history = ControlNode.get_ref_z_log()
-            ref_yaw_history = ControlNode.get_ref_yaw_log()
-            pred_time_history = ControlNode.get_pred_timel_log()
-            nr_time_history = ControlNode.get_nr_timel_log()
-            metadata = ControlNode.get_metadata()
+            time_history = ControlNode.get_ctrl_loop_time_log() #0
+
+            x_history = ControlNode.get_x_log() #1
+            y_history = ControlNode.get_y_log() #2
+            z_history = ControlNode.get_z_log() #3
+            yaw_history = ControlNode.get_yaw_log() #4
+            throttle_history = ControlNode.get_throttle_log() #5
+            roll_history = ControlNode.get_roll_log() #6
+            pitch_history = ControlNode.get_pitch_log() #7
+            yaw_rate_history = ControlNode.get_yaw_rate_log() #8
+            ref_x_history = ControlNode.get_ref_x_log() #9
+            ref_y_history = ControlNode.get_ref_y_log() #10
+            ref_z_history = ControlNode.get_ref_z_log() #11
+            ref_yaw_history = ControlNode.get_ref_yaw_log() #12
+            pred_time_history = ControlNode.get_pred_timel_log() #13
+            nr_time_history = ControlNode.get_nr_timel_log() #14
+            metadata = ControlNode.get_metadata() #15
             """
             def get_x_log(self): return np.array(self.x_log).reshape(-1, 1)
             def get_y_log(self): return np.array(self.y_log).reshape(-1, 1)

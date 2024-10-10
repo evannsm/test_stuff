@@ -17,7 +17,7 @@ from std_msgs.msg import Float64MultiArray
 from .workingModel import Quadrotor
 from .workingGenMPC import QuadrotorMPC2
 
-from tf_transformations import euler_from_quaternion
+# from tf_transformations import euler_from_quaternion
 import numpy as np
 import math as m
 import time
@@ -266,8 +266,115 @@ class OffboardControl(Node):
             collective_thrust = a*throttle_command**2 + b*throttle_command + c
             return -collective_thrust
 
+    def euler_from_matrix(self, matrix, axes='sxyz'):
+        """Return Euler angles from rotation matrix for specified axis sequence.
 
+        axes : One of 24 axis sequences as string or encoded tuple
 
+        Note that many Euler angle triplets can describe one matrix.
+
+        # >>> R0 = euler_matrix(1, 2, 3, 'syxz')
+        # >>> al, be, ga = euler_from_matrix(R0, 'syxz')
+        # >>> R1 = euler_matrix(al, be, ga, 'syxz')
+        # >>> numpy.allclose(R0, R1)
+        # True
+        # >>> angles = (4.0*math.pi) * (numpy.random.random(3) - 0.5)
+        # >>> for axes in _AXES2TUPLE.keys():
+        # ...    R0 = euler_matrix(axes=axes, *angles)
+        # ...    R1 = euler_matrix(axes=axes, *euler_from_matrix(R0, axes))
+        # ...    if not numpy.allclose(R0, R1): print axes, "failed"
+
+        # """
+
+        # epsilon for testing whether a number is close to zero
+        _EPS = np.finfo(float).eps * 4.0
+
+        # axis sequences for Euler angles
+        _NEXT_AXIS = [1, 2, 0, 1]
+
+        # map axes strings to/from tuples of inner axis, parity, repetition, frame
+        _AXES2TUPLE = {
+            'sxyz': (0, 0, 0, 0), 'sxyx': (0, 0, 1, 0), 'sxzy': (0, 1, 0, 0),
+            'sxzx': (0, 1, 1, 0), 'syzx': (1, 0, 0, 0), 'syzy': (1, 0, 1, 0),
+            'syxz': (1, 1, 0, 0), 'syxy': (1, 1, 1, 0), 'szxy': (2, 0, 0, 0),
+            'szxz': (2, 0, 1, 0), 'szyx': (2, 1, 0, 0), 'szyz': (2, 1, 1, 0),
+            'rzyx': (0, 0, 0, 1), 'rxyx': (0, 0, 1, 1), 'ryzx': (0, 1, 0, 1),
+            'rxzx': (0, 1, 1, 1), 'rxzy': (1, 0, 0, 1), 'ryzy': (1, 0, 1, 1),
+            'rzxy': (1, 1, 0, 1), 'ryxy': (1, 1, 1, 1), 'ryxz': (2, 0, 0, 1),
+            'rzxz': (2, 0, 1, 1), 'rxyz': (2, 1, 0, 1), 'rzyz': (2, 1, 1, 1)}
+
+        _TUPLE2AXES = dict((v, k) for k, v in _AXES2TUPLE.items())
+
+        try:
+            firstaxis, parity, repetition, frame = _AXES2TUPLE[axes.lower()]
+        except (AttributeError, KeyError):
+            _ = _TUPLE2AXES[axes]
+            firstaxis, parity, repetition, frame = axes
+
+        i = firstaxis
+        j = _NEXT_AXIS[i+parity]
+        k = _NEXT_AXIS[i-parity+1]
+
+        M = np.array(matrix, dtype=np.float64, copy=False)[:3, :3]
+        if repetition:
+            sy = m.sqrt(M[i, j]*M[i, j] + M[i, k]*M[i, k])
+            if sy > _EPS:
+                ax = m.atan2( M[i, j],  M[i, k])
+                ay = m.atan2( sy,       M[i, i])
+                az = m.atan2( M[j, i], -M[k, i])
+            else:
+                ax = m.atan2(-M[j, k],  M[j, j])
+                ay = m.atan2( sy,       M[i, i])
+                az = 0.0
+        else:
+            cy = m.sqrt(M[i, i]*M[i, i] + M[j, i]*M[j, i])
+            if cy > _EPS:
+                ax = m.atan2( M[k, j],  M[k, k])
+                ay = m.atan2(-M[k, i],  cy)
+                az = m.atan2( M[j, i],  M[i, i])
+            else:
+                ax = m.atan2(-M[j, k],  M[j, j])
+                ay = m.atan2(-M[k, i],  cy)
+                az = 0.0
+
+        if parity:
+            ax, ay, az = -ax, -ay, -az
+        if frame:
+            ax, az = az, ax
+        return ax, ay, az
+
+    def quaternion_matrix(self, quaternion):
+        """Return homogeneous rotation matrix from quaternion.
+
+        >>> R = quaternion_matrix([0.06146124, 0, 0, 0.99810947])
+        >>> numpy.allclose(R, rotation_matrix(0.123, (1, 0, 0)))
+        True
+
+        """
+        _EPS = np.finfo(float).eps * 4.0
+
+        q = np.array(quaternion[:4], dtype=np.float64, copy=True)
+        nq = np.dot(q, q)
+        if nq < _EPS:
+            return np.identity(4)
+        q *= m.sqrt(2.0 / nq)
+        q = np.outer(q, q)
+        return np.array((
+            (1.0-q[1, 1]-q[2, 2],     q[0, 1]-q[2, 3],     q[0, 2]+q[1, 3], 0.0),
+            (    q[0, 1]+q[2, 3], 1.0-q[0, 0]-q[2, 2],     q[1, 2]-q[0, 3], 0.0),
+            (    q[0, 2]-q[1, 3],     q[1, 2]+q[0, 3], 1.0-q[0, 0]-q[1, 1], 0.0),
+            (                0.0,                 0.0,                 0.0, 1.0)
+            ), dtype=np.float64)
+
+    def euler_from_quaternion(self, quaternion, axes='sxyz'):
+        """Return Euler angles from quaternion for specified axis sequence.
+
+        >>> angles = euler_from_quaternion([0.06146124, 0, 0, 0.99810947])
+        >>> numpy.allclose(angles, [0.123, 0, 0])
+        True
+
+        """
+        return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
 
     def normalize_angle(self, angle):
         """ Normalize the angle to the range [-pi, pi]. """
@@ -286,14 +393,14 @@ class OffboardControl(Node):
     def vehicle_odometry_callback(self, msg): # Odometry Callback Function Yields Position, Velocity, and Attitude Data
         """Callback function for vehicle_odometry topic subscriber."""
         # print("AT ODOM CALLBACK")
-        (self.yaw, self.pitch, self.roll) = euler_from_quaternion(msg.q)
+        (self.yaw, self.pitch, self.roll) = self.euler_from_quaternion(msg.q)
         # print("not yaw:")
         # not_yaw = self.new_angle_wrapper(self.yaw)
         # print("\nyaw: ")
         # self.yaw = self.old_angle_wrapper(self.yaw)
 
         self.yaw = self.new_angle_wrapper(self.yaw)
-        self.pitch = -1 * self.pitch #pitch is negative of the value in gazebo bc of frame difference
+        self.pitch = -1 * self.pitch # pitch is negative of the value in gazebo bc of frame difference
 
         self.p = msg.angular_velocity[0]
         self.q = msg.angular_velocity[1]
@@ -417,21 +524,20 @@ class OffboardControl(Node):
 
 
 #~~~~~~~~~~~~~~~ Calculate reference trajectory ~~~~~~~~~~~~~~~
-        # reffunc = self.circle_vert_ref_func()
-        reffunc = self.circle_horz_ref_func()
-        # reffunc = self.fig8_horz_ref_func()
-        # reffunc = self.fig8_vert_ref_func_short()
-        # reffunc = self.fig8_vert_ref_func_tall()
-        # reffunc = self.hover_ref_func(1)
-        # reffunc = self.yaw_ref(3)
-        # reffunc = self.spiral_staircases(6)
-        # if self.time_from_start <= 10.0:
-        #     reffunc = self.hover_ref_func(1)
-        # elif self.time_from_start > 10.0:
-        #     reffunc = self.hover_ref_func(1)
-        # print(f"reffunc: {reffunc[:,1]}")
+        if self.time_from_start <= 10.0:
+            reffunc = self.hover_ref_func(1)
+        else:
+            reffunc = self.circle_horz_ref_func()
+            reffunc = self.circle_horz_spin_ref_func()
+            reffunc = self.circle_vert_ref_func()
+            reffunc = self.fig8_horz_ref_func()
+            reffunc = self.fig8_vert_ref_func_short()
+            reffunc = self.fig8_vert_ref_func_tall()
+            reffunc = self.helix()
+            reffunc = self.helix_spin
 
         reffunc = self.hover_ref_func(1)
+        print(f"reffunc: {reffunc}")
 
         # Calculate the MPC control input and transform the force into a throttle command for publishing to the vehicle
         new_u = self.get_new_control_input(reffunc)
@@ -621,7 +727,7 @@ class OffboardControl(Node):
 
         x = .35*m.sin(2*w*t)
         y = .35*m.sin(w*t)
-        z = -1.25
+        z = -0.8
         vx = 0.0
         vy = 0.0
         vz = 0.0

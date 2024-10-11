@@ -80,8 +80,8 @@ class QuadrotorMPC2:
 
         # ocp.model.cost_expr_ext_cost_e = 0.
 
-        Q = 50* np.diag([20., 20., 20., 2., 2., 2., 1., 1., 20.])
-        R = diag(horzcat(1., 1., 1., 1.))
+        Q = 50 * np.diag([20., 20., 20., 2., 2., 2., 1., 1., 20.])
+        R = 1 * diag(horzcat(1., 1., 1., 1.))
         W = block_diag(Q,R)
 
         ocp.cost.cost_type = 'LINEAR_LS'

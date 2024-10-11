@@ -18,6 +18,8 @@ from .workingModel import Quadrotor
 from .workingGenMPC import QuadrotorMPC2
 
 # from tf_transformations import euler_from_quaternion
+import transforms3d
+
 import numpy as np
 import math as m
 import time
@@ -36,7 +38,8 @@ class OffboardControl(Node):
     """Node for controlling a vehicle in offboard mode."""
     def __init__(self) -> None:
         super().__init__('offboard_control_takeoff_and_land')
-
+        self.mocap_k = -1
+        self.full_rotations = 0
 ###############################################################################################################################################
 
         # Figure out if in simulation or hardware mode to set important variables to the appropriate values
@@ -381,14 +384,90 @@ class OffboardControl(Node):
         """ Normalize the angle to the range [-pi, pi]. """
         return m.atan2(m.sin(angle), m.cos(angle))
 
-    def quaternion_to_euler_ned(self, quaternion):
-        q0, q1, q2, q3 = quaternion
-        roll = np.arctan2(2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1**2 + q2**2)) # Compute roll (phi)
-        pitch = np.arcsin(-2 * (q1 * q3 - q0 * q2)) # Compute pitch (theta)
-        yaw = np.arctan2(2 * (q0 * q3 + q1 * q2), 1 - 2 * (q2**2 + q3**2)) # Compute yaw (psi)
+    def _reorder_input_quaternion(self, quaternion):
+        """Reorder quaternion to have w term first."""
+        # x, y, z, w = quaternion
+        return quaternion
 
-        return roll, pitch, yaw  
-    
+    def quaternion_matrix(self, quaternion):
+        """
+        Return homogeneous rotation matrix from quaternion.
+
+        >>> R = quaternion_matrix([0.06146124, 0, 0, 0.99810947])
+        >>> numpy.allclose(R, rotation_matrix(0.123, (1, 0, 0)))
+        True
+
+        """
+        TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
+        ROTATION_IDENTITY = np.identity(3, dtype=np.float64)
+        ZOOM_IDENTITY = [1.0, 1.0, 1.0]
+        SHEAR_IDENTITY = TRANSLATION_IDENTITY
+        rotation_matrix = transforms3d.quaternions.quat2mat(
+            self._reorder_input_quaternion(quaternion)
+        )
+        return transforms3d.affines.compose(TRANSLATION_IDENTITY,
+                                            rotation_matrix,
+                                            ZOOM_IDENTITY)
+
+    def euler_from_matrix(self, matrix, axes='sxyz'):
+        """
+        Return Euler angles from rotation matrix for specified axis sequence.
+
+        axes : One of 24 axis sequences as string or encoded tuple
+
+        Note that many Euler angle triplets can describe one matrix.
+
+        >>> R0 = euler_matrix(1, 2, 3, 'syxz')
+        >>> al, be, ga = euler_from_matrix(R0, 'syxz')
+        >>> R1 = euler_matrix(al, be, ga, 'syxz')
+        >>> numpy.allclose(R0, R1)
+        True
+        >>> angles = (4.0*math.pi) * (numpy.random.random(3) - 0.5)
+        >>> for axes in _AXES2TUPLE.keys():
+        ...    R0 = euler_matrix(axes=axes, *angles)
+        ...    R1 = euler_matrix(axes=axes, *euler_from_matrix(R0, axes))
+        ...    if not numpy.allclose(R0, R1): print axes, "failed"
+
+        """
+        return transforms3d.euler.mat2euler(matrix, axes=axes)
+
+
+    def euler_from_quaternion(self, quaternion, axes='sxyz'):
+        """
+        Return Euler angles from quaternion for specified axis sequence.
+
+        >>> angles = euler_from_quaternion([0.06146124, 0, 0, 0.99810947])
+        >>> numpy.allclose(angles, [0.123, 0, 0])
+        True
+
+        """
+        return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
+
+    def adjust_yaw(self, yaw):
+        mocap_psi = yaw
+        self.mocap_k += 1
+        psi = None
+        
+        if self.mocap_k == 0:
+            self.prev_mocap_psi = mocap_psi
+            psi = mocap_psi
+
+        elif self.mocap_k > 0:
+            # mocap angles are from -pi to pi, whereas the angle state variable in the MPC is an absolute angle (i.e. no modulus)
+            # I correct for this discrepancy here
+            if self.prev_mocap_psi > np.pi*0.9 and mocap_psi < -np.pi*0.9:
+                # Crossed 180 deg, CCW
+                self.full_rotations += 1
+            elif self.prev_mocap_psi < -np.pi*0.9 and mocap_psi > np.pi*0.9:
+                # Crossed 180 deg, CW
+                self.full_rotations -= 1
+
+            psi = mocap_psi + 2*np.pi * self.full_rotations
+            self.prev_mocap_psi = mocap_psi
+        
+        return psi
+
+
     def vehicle_odometry_callback(self, msg): # Odometry Callback Function Yields Position, Velocity, and Attitude Data
         """Callback function for vehicle_odometry topic subscriber."""
         # print('vehicle odometry callback')
@@ -401,7 +480,8 @@ class OffboardControl(Node):
         self.vy = msg.velocity[1]
         self.vz = msg.velocity[2]
 
-        self.roll, self.pitch, self.yaw = self.quaternion_to_euler_ned(msg.q)
+        self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
+        self.yaw = self.adjust_yaw(yaw)
 
         self.p = msg.angular_velocity[0]
         self.q = msg.angular_velocity[1]
@@ -528,14 +608,14 @@ class OffboardControl(Node):
 
         # reffunc = self.yawing_only()
         # reffunc = self.hover_ref_func(1)
-        reffunc = self.circle_horz_ref_func()
+        # reffunc = self.circle_horz_ref_func()
         # reffunc = self.circle_horz_spin_ref_func()
         # reffunc = self.circle_vert_ref_func()
         # reffunc = self.fig8_horz_ref_func()
         # reffunc = self.fig8_vert_ref_func_short()
         # reffunc = self.fig8_vert_ref_func_tall()
         # reffunc = self.helix()
-        # reffunc = self.helix_spin()
+        reffunc = self.helix_spin()
         print(f"reffunc: {reffunc[:,0]}")
 
         # Calculate the MPC control input and transform the force into a throttle command for publishing to the vehicle
@@ -678,7 +758,7 @@ class OffboardControl(Node):
         w = 2*m.pi / PERIOD
 
         SPIN_PERIOD = 15
-        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD / (2*m.pi)) )
+        yaw_ref = t / (SPIN_PERIOD / (2*m.pi))
         x = .6*m.cos(w*t)
         y = .6*m.sin(w*t)
         z = -0.8
@@ -828,7 +908,7 @@ class OffboardControl(Node):
         height_variance = 0.3
 
         SPIN_PERIOD = 15
-        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD / (2*m.pi)) )
+        yaw_ref = t / (SPIN_PERIOD / (2*m.pi))
 
         x = .6*m.cos(w*t)
         y = .6*m.sin(w*t)
@@ -851,7 +931,7 @@ class OffboardControl(Node):
         t = self.time_from_start + self.T_lookahead
 
         SPIN_PERIOD = 7
-        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD / (2*m.pi)) )
+        yaw_ref = t / (SPIN_PERIOD / (2*m.pi))
 
         r = np.array([[0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, yaw_ref]]).T
         r_final = np.tile(r, (1, self.num_steps))

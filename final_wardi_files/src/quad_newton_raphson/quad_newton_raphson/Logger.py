@@ -6,10 +6,6 @@ class Logger:
 
     def __init__(self, filename):
         self.filename = filename[0]
-        # base_path = '/home/factslabegmc/final_wardi_files/src/quad_newton_raphson/quad_newton_raphson/data_analysis/'
-        # self.full_path = os.path.join(base_path, self.filename)
-        # print(f"Logging to: {self.full_path}")
-
         base_path = os.path.dirname(os.path.abspath(__file__))        # Get the directory where the script is located
         base_path = os.path.join(base_path, 'data_analysis')
         print(f"logger {base_path = }")        # Print the base path

@@ -1,6 +1,3 @@
-# TODO: 1) change time.time() to time.process_time
-
-
 wardiNN_on = bool(int(input("Is the wardiNN conda env activated? Press 0 for No and 1 for Yes: ")))
 if wardiNN_on:
     print("You're all set :)")
@@ -19,19 +16,23 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from px4_msgs.msg import OffboardControlMode, VehicleRatesSetpoint, VehicleCommand, VehicleStatus, VehicleOdometry, TrajectorySetpoint, RcChannels
 from std_msgs.msg import Float64MultiArray
 
-# from tf_transformations import euler_from_quaternion
+from tf_transformations import euler_from_quaternion
+import transforms3d
+
 import sympy as smp
 import numpy as np
 import math as m
-import scipy as sp
+
 import scipy.integrate as sp_int
 import scipy.linalg as sp_linalg
 
 import jax.numpy as jnp
 from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
+from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
 
 import time
 import ctypes
+
 
 from pyJoules.handler.csv_handler import CSVHandler
 from pyJoules.device.rapl_device import RaplPackageDomain, RaplCoreDomain
@@ -46,7 +47,8 @@ class OffboardControl(Node):
     """Node for controlling a vehicle in offboard mode."""
     def __init__(self) -> None:
         super().__init__('offboard_control_takeoff_and_land')
-
+        self.mocap_k = -1
+        self.full_rotations = 0
 ###############################################################################################################################################
 
         # Figure out if in simulation or hardware mode to set important variables to the appropriate values
@@ -141,17 +143,19 @@ class OffboardControl(Node):
         # exit(0)
 
 ###############################################################################################################################################
-        self.use_quat_yaw: bool = bool(int(input("Use quaternion for yaw error? Press 1 for Yes and 0 for No: ")))
-        print(f"{'Using quaternion for yaw error' if self.use_quat_yaw else 'Using angle for yaw error'}")
+        # self.use_quat_yaw: bool = bool(int(input("Use quaternion for yaw error? Press 1 for Yes and 0 for No: ")))
+        self.use_quat_yaw = True
+        # print(f"{'Using quaternion for yaw error' if self.use_quat_yaw else 'Using angle for yaw error'}")
 
-        self.pred_type = int(input("JaxNonlin, Neural Network, Linear, or C-CompiledNonlin -based Predictor? Write 3 for Jax, 2 for NN, 1 for Linear and 0 for Nonlinear: "))
+        self.pred_type = int(input("JaxNonlin, Neural Network, or C-CompiledNonlin -based Predictor? Write 3 for Jax, 2 for NN, and 0 for Nonlinear: "))
         print(f"Predictor #{self.pred_type}: Using {'Jax' if self.pred_type == 3 else 'NN' if self.pred_type == 2 else 'Linear' if self.pred_type == 1 else 'Nonlinear'} Predictor")
 
         self.C = self.observer_matrix() #Calculate Observer Matrix Needed After Predictions of all States to Get Only the States We Need in Output
 
-        self.nonlin0 = None
-        if self.pred_type == 0: #Nonlinear Predictor
-            self.nonlin0 = not bool(int(input("Press 0 for 0-Order Hold and 1 for 1st-Order Hold: ")))
+        self.nonlin0 = False
+        if self.pred_type == 0 or self.pred_type == 3: #Nonlinear Predictor
+            self.nonlin0 = True # use 1st order hold for now
+            # self.nonlin0 = not bool(int(input("Press 0 for 0-Order Hold and 1 for 1st-Order Hold: ")))
 
         if self.pred_type == 0: #Nonlinear Predictor
             # print("Using Nonlinear Predictor")
@@ -169,7 +173,7 @@ class OffboardControl(Node):
                 ]
 
             if self.nonlin0:
-                print("Using 0-Order Hold Predictor")
+                print("Using CPP 0-Order Hold Predictor")
                 # Load the C shared library
                 self.my_library = ctypes.CDLL('/home/factslabegmc/NRJournal/src/newton_raphson/newton_raphson/nonlin_0order.so')  # Update the library filename
                 # Set argument and return types for the function
@@ -179,7 +183,7 @@ class OffboardControl(Node):
                     ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int
                     ] 
             else:
-                print("Using 1st-Order Hold Predictor")
+                print("Using CPP 1st-Order Hold Predictor")
                 self.udot = np.array([[0, 0, 0, 0]], dtype=np.float64).T
                 print(f"udot: {self.udot}")
                 print(f"udot shape: {self.udot.shape}")
@@ -230,12 +234,17 @@ class OffboardControl(Node):
                 
             self.NN = FeedForward()
             if self.sim:
-                self.NN.load_state_dict(torch.load('/home/factslabegmc/NRJournal/src/newton_raphson/newton_raphson/sim_ff.pt'))
+                self.NN.load_state_dict(torch.load('/home/factslabegmc/final_wardi_files/src/quad_newton_raphson/quad_newton_raphson/sim_ff.pt'))
             else:
-                self.NN.load_state_dict(torch.load('/home/factslabegmc/NRJournal/src/newton_raphson/newton_raphson/holybro_ff.pt'))
+                self.NN.load_state_dict(torch.load('/home/factslabegmc/final_wardi_files/src/quad_newton_raphson/quad_newton_raphson/holybro_ff.pt'))
 
         if self.pred_type == 3: #Jax Predictor
             print("Using Jax")
+            if self.nonlin0:
+                print("Using Jax 0 Order Hold Predictor")
+            else:
+                print("Using Jax 1stOrder Hold Predictor")
+                self.udot = np.array([[0, 0, 0, 0]], dtype=np.float64).T
 
         self.metadata = np.array(['Sim' if self.sim else 'Hardware',
                                   'Jax' if self.pred_type == 3 else 'NN' if self.pred_type == 2 else 'Linear' if self.pred_type == 1 else 'Nonlinear',
@@ -377,13 +386,89 @@ class OffboardControl(Node):
         """ Normalize the angle to the range [-pi, pi]. """
         return m.atan2(m.sin(angle), m.cos(angle))
 
-    def quaternion_to_euler_ned(self, quaternion):
-        q0, q1, q2, q3 = quaternion
-        roll = np.arctan2(2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1**2 + q2**2)) # Compute roll (phi)
-        pitch = np.arcsin(-2 * (q1 * q3 - q0 * q2)) # Compute pitch (theta)
-        yaw = np.arctan2(2 * (q0 * q3 + q1 * q2), 1 - 2 * (q2**2 + q3**2)) # Compute yaw (psi)
+    def _reorder_input_quaternion(self, quaternion):
+        """Reorder quaternion to have w term first."""
+        # x, y, z, w = quaternion
+        return quaternion
 
-        return roll, pitch, yaw   
+    def quaternion_matrix(self, quaternion):
+        """
+        Return homogeneous rotation matrix from quaternion.
+
+        >>> R = quaternion_matrix([0.06146124, 0, 0, 0.99810947])
+        >>> numpy.allclose(R, rotation_matrix(0.123, (1, 0, 0)))
+        True
+
+        """
+        TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
+        ROTATION_IDENTITY = np.identity(3, dtype=np.float64)
+        ZOOM_IDENTITY = [1.0, 1.0, 1.0]
+        SHEAR_IDENTITY = TRANSLATION_IDENTITY
+        rotation_matrix = transforms3d.quaternions.quat2mat(
+            self._reorder_input_quaternion(quaternion)
+        )
+        return transforms3d.affines.compose(TRANSLATION_IDENTITY,
+                                            rotation_matrix,
+                                            ZOOM_IDENTITY)
+
+    def euler_from_matrix(self, matrix, axes='sxyz'):
+        """
+        Return Euler angles from rotation matrix for specified axis sequence.
+
+        axes : One of 24 axis sequences as string or encoded tuple
+
+        Note that many Euler angle triplets can describe one matrix.
+
+        >>> R0 = euler_matrix(1, 2, 3, 'syxz')
+        >>> al, be, ga = euler_from_matrix(R0, 'syxz')
+        >>> R1 = euler_matrix(al, be, ga, 'syxz')
+        >>> numpy.allclose(R0, R1)
+        True
+        >>> angles = (4.0*math.pi) * (numpy.random.random(3) - 0.5)
+        >>> for axes in _AXES2TUPLE.keys():
+        ...    R0 = euler_matrix(axes=axes, *angles)
+        ...    R1 = euler_matrix(axes=axes, *euler_from_matrix(R0, axes))
+        ...    if not numpy.allclose(R0, R1): print axes, "failed"
+
+        """
+        return transforms3d.euler.mat2euler(matrix, axes=axes)
+
+
+    def euler_from_quaternion(self, quaternion, axes='sxyz'):
+        """
+        Return Euler angles from quaternion for specified axis sequence.
+
+        >>> angles = euler_from_quaternion([0.06146124, 0, 0, 0.99810947])
+        >>> numpy.allclose(angles, [0.123, 0, 0])
+        True
+
+        """
+        return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
+    
+
+    def adjust_yaw(self, yaw):
+        mocap_psi = yaw
+        self.mocap_k += 1
+        psi = None
+        
+        if self.mocap_k == 0:
+            self.prev_mocap_psi = mocap_psi
+            psi = mocap_psi
+
+        elif self.mocap_k > 0:
+            # mocap angles are from -pi to pi, whereas the angle state variable in the MPC is an absolute angle (i.e. no modulus)
+            # I correct for this discrepancy here
+            if self.prev_mocap_psi > np.pi*0.9 and mocap_psi < -np.pi*0.9:
+                # Crossed 180 deg, CCW
+                self.full_rotations += 1
+            elif self.prev_mocap_psi < -np.pi*0.9 and mocap_psi > np.pi*0.9:
+                # Crossed 180 deg, CW
+                self.full_rotations -= 1
+
+            psi = mocap_psi + 2*np.pi * self.full_rotations
+            self.prev_mocap_psi = mocap_psi
+        
+        return psi
 
     def vehicle_odometry_callback(self, msg): # Odometry Callback Function Yields Position, Velocity, and Attitude Data
         """Callback function for vehicle_odometry topic subscriber."""
@@ -397,7 +482,8 @@ class OffboardControl(Node):
         self.vy = msg.velocity[1]
         self.vz = msg.velocity[2]
 
-        self.roll, self.pitch, self.yaw = self.quaternion_to_euler_ned(msg.q)
+        self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
+        self.yaw = self.adjust_yaw(yaw)
 
         self.p = msg.angular_velocity[0]
         self.q = msg.angular_velocity[1]
@@ -529,14 +615,14 @@ class OffboardControl(Node):
 
         # reffunc = self.yawing_only()
         # reffunc = self.hover_ref_func(1)
-        reffunc = self.circle_horz_ref_func()
+        # reffunc = self.circle_horz_ref_func()
         # reffunc = self.circle_horz_spin_ref_func()
         # reffunc = self.circle_vert_ref_func()
         # reffunc = self.fig8_horz_ref_func()
         # reffunc = self.fig8_vert_ref_func_short()
         # reffunc = self.fig8_vert_ref_func_tall()
         # reffunc = self.helix()
-        # reffunc = self.helix_spin()
+        reffunc = self.helix_spin()
         print(f"reffunc: {reffunc}")
 
         # Calculate the Newton-Rapshon control input and transform the force into a throttle command for publishing to the vehicle
@@ -813,26 +899,45 @@ class OffboardControl(Node):
 # ~~ The following functions have the various non-linear models and neural networks for predicting the system output state ~~
     def get_jax_predict(self, last_input): #Predicts System Output State Using Jax
         """ Predicts the system output state using a numerically integrated nonlinear model. """
-        # t1 = time.time()
-        STATE = jnp.array([self.state_vector[0][0], self.state_vector[1][0], self.state_vector[2][0], self.state_vector[3][0], self.state_vector[4][0], self.state_vector[5][0], self.state_vector[6][0], self.state_vector[7][0], self.state_vector[8][0]])
-        INPUT = jnp.array([-last_input[0][0], last_input[1][0], last_input[2][0], last_input[3][0]])
-        # print(f"STATE: \n{STATE}")
-        outputs = predict_outputs(STATE, INPUT, self.T_LOOKAHEAD, self.GRAVITY, self.MASS, self.C, integration_step=0.1)
-        # print(f"Outputs: \n{outputs}")
-        adjusted_invjac = compute_adjusted_invjac(STATE, INPUT, self.T_LOOKAHEAD, self.GRAVITY, self.MASS, self.C, integration_step=0.1)
-        # print(f"adjusted_invjac: \n{adjusted_invjac}")
+        if self.nonlin0: 
+            print(f"0 order hold jax")
+            # t1 = time.time()
+            STATE = jnp.array([self.state_vector[0][0], self.state_vector[1][0], self.state_vector[2][0], self.state_vector[3][0], self.state_vector[4][0], self.state_vector[5][0], self.state_vector[6][0], self.state_vector[7][0], self.state_vector[8][0]])
+            INPUT = jnp.array([-last_input[0][0], last_input[1][0], last_input[2][0], last_input[3][0]])
+            # print(f"STATE: \n{STATE}")
+            outputs = predict_outputs(STATE, INPUT, self.T_LOOKAHEAD, self.GRAVITY, self.MASS, self.C, integration_step=0.1)
+            # print(f"Outputs: \n{outputs}")
+            adjusted_invjac = compute_adjusted_invjac(STATE, INPUT, self.T_LOOKAHEAD, self.GRAVITY, self.MASS, self.C, integration_step=0.1)
+            # print(f"adjusted_invjac: \n{adjusted_invjac}")
 
 
-        outputs = np.array(outputs).reshape(-1, 1)
-        # print(f"{outputs = }")
-        # print(f"{type(outputs) = }")
-        adjusted_invjac = np.array(adjusted_invjac)
-        # print(f"{adjusted_invjac = }")
-        # print(f"{type(adjusted_invjac) = }")
-        self.jac_inv = adjusted_invjac
+            outputs = np.array(outputs).reshape(-1, 1)
+            # print(f"{outputs = }")
+            # print(f"{type(outputs) = }")
+            adjusted_invjac = np.array(adjusted_invjac)
+            # print(f"{adjusted_invjac = }")
+            # print(f"{type(adjusted_invjac) = }")
+            self.jac_inv = adjusted_invjac
 
-        # exit(0)
-        return outputs
+            # exit(0)
+            return outputs
+        
+        elif not self.nonlin0:
+            print(f"1 order hold jax")
+            STATE = jnp.array([self.state_vector[0][0], self.state_vector[1][0], self.state_vector[2][0], self.state_vector[3][0], self.state_vector[4][0], self.state_vector[5][0], self.state_vector[6][0], self.state_vector[7][0], self.state_vector[8][0]])
+            INPUT = jnp.array([-last_input[0][0], last_input[1][0], last_input[2][0], last_input[3][0]])
+            INPUT_DERIVS = jnp.array([self.udot[0][0], self.udot[1][0], self.udot[2][0], self.udot[3][0]])
+            outputs = predict_outputs_1order(STATE, INPUT, INPUT_DERIVS, self.T_LOOKAHEAD, self.GRAVITY, self.MASS, self.C, integration_step=0.1)
+            adjusted_invjac = compute_adjusted_invjac_1order(STATE, INPUT, INPUT_DERIVS, self.T_LOOKAHEAD, self.GRAVITY, self.MASS, self.C, integration_step=0.1)
+
+            outputs = np.array(outputs).reshape(-1, 1)
+            # print(f"{outputs = }")
+            # print(f"{type(outputs) = }")
+            adjusted_invjac = np.array(adjusted_invjac)
+            # print(f"{adjusted_invjac = }")
+            # print(f"{type(adjusted_invjac) = }")
+            self.jac_inv = adjusted_invjac
+            return outputs
 
     def get_nn_predict(self, last_input): #Predicts System Output State Using Neural Network
         """ Predicts the system output state using a feedforward neural network. """
@@ -853,7 +958,7 @@ class OffboardControl(Node):
 
         # print("Feed Forward NN")
         # t1 = time.time()
-        # outputNN = self.NN(dataNN)
+        outputNN = self.NN(dataNN)
         # print(f"outputNN: {outputNN}")
 
         # Compute Jacobian
@@ -896,8 +1001,8 @@ class OffboardControl(Node):
         curr_pitchdot = last_input[2][0]
         curr_yawdot = last_input[3][0]
 
-        print(f"{self.state_vector = }")
-        print(f"[curr_thrust, curr_rolldot, curr_pitchdot, curr_yawdot] = [{curr_thrust, curr_rolldot, curr_pitchdot, curr_yawdot}]")
+        # print(f"{self.state_vector = }")
+        # print(f"[curr_thrust, curr_rolldot, curr_pitchdot, curr_yawdot] = [{curr_thrust, curr_rolldot, curr_pitchdot, curr_yawdot}]")
 
 
         curr_x = self.x
@@ -1018,16 +1123,16 @@ class OffboardControl(Node):
 
             jac_u = np.hstack([dpdu1, dpdu2, dpdu3, dpdu4])
             # print(f"dpdu3: {dpdu3}")
-            print(f"jac_u: {jac_u}")
+            # print(f"jac_u: {jac_u}")
             # print(f"jac_u.shape: {jac_u.shape}")
             # make the third column of inverse jacobian negative
             inv_jac = np.linalg.inv(jac_u)
-            print(f"inv_jac: {inv_jac}")
+            # print(f"inv_jac: {inv_jac}")
             inv_jac[:, 2] = -inv_jac[:, 2]
-            print(f"inv_jac: {inv_jac}")
+            # print(f"inv_jac: {inv_jac}")
 
             self.jac_inv = inv_jac
-            print(f"jac_inv:  {self.jac_inv}")
+            # print(f"jac_inv:  {self.jac_inv}")
             # exit(0)
 
         else:
@@ -1409,7 +1514,8 @@ class OffboardControl(Node):
         w = 2*m.pi / PERIOD
 
         SPIN_PERIOD = 10
-        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
+        # yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
+        yaw_ref = t / (SPIN_PERIOD/(2*np.pi))
         r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -0.8, yaw_ref ]]).T
 
         return r
@@ -1485,7 +1591,8 @@ class OffboardControl(Node):
         height_variance = 0.3
 
         SPIN_PERIOD = 15
-        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
+        # yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
+        yaw_ref = t / (SPIN_PERIOD/(2*np.pi))
         r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -1*(z0 + height_variance * m.sin(w_z * t)), yaw_ref]]).T
         return r
     
@@ -1495,7 +1602,8 @@ class OffboardControl(Node):
 
         t = self.time_from_start + self.T_LOOKAHEAD
         SPIN_PERIOD = 7
-        yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
+        # yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
+        yaw_ref = t / (SPIN_PERIOD/(2*np.pi))
         r = np.array([[0., 0., -0.5, yaw_ref]]).T
         return r
     

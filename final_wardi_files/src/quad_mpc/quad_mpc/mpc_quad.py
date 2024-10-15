@@ -21,8 +21,34 @@ else:
     print("I can see that conda environment 'wardiNN' is activated!!!!")
     print("Ok you're all set :)")
 
+import numpy as np
+if np.__version__ != '1.23.4':
+    # print("Please use numpy version 1.23.4")
+    # exit(1)
+    print(f"{np.__version__ = }")
+    raise EnvironmentError("Please use numpy version 1.23.4")
+else:
+    print(f"Using numpy version 1.23.4!")
 
+import scipy
+if scipy.__version__ != '1.10.1':
+    # print("Please use scipy version 1.7.3")
+    # exit(1)
+    print(f"{scipy.__version__ = }")
+    raise EnvironmentError("Please use scipy version 1.10.1")
+else:
+    print(f"Using scipy version 1.10.1!")
 
+import sys
+if (sys.version_info.major != 3 or sys.version_info.minor != 8 or sys.version_info.micro != 10):
+    # exit(1)
+    print(f"python version {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+    print(f"{sys.version = }")
+    raise EnvironmentError("Please use Python 3.8.10")
+else:
+    print(f"Using Python 3.8.10!")
+
+exit(1)
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
@@ -35,7 +61,6 @@ from .workingGenMPC import QuadrotorMPC2
 from transforms3d.euler import quat2euler
 # import transforms3d
 
-import numpy as np
 import math as m
 import time
 
@@ -43,8 +68,6 @@ from pyJoules.handler.csv_handler import CSVHandler
 from pyJoules.device.rapl_device import RaplPackageDomain, RaplCoreDomain
 from pyJoules.energy_meter import EnergyContext
 
-
-import sys
 import traceback
 from .Logger import Logger
 

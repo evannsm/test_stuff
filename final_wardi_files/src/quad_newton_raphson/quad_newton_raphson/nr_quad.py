@@ -21,6 +21,34 @@ else:
     print("I can see that conda environment 'wardiNN' is activated!!!!")
     print("Ok you're all set :)")
 
+import numpy as np
+if np.__version__ != '1.23.4':
+    # print("Please use numpy version 1.23.4")
+    # exit(1)
+    print(f"{np.__version__ = }")
+    raise EnvironmentError("Please use numpy version 1.23.4")
+else:
+    print(f"Using numpy version 1.23.4!")
+
+import scipy
+if scipy.__version__ != '1.10.1':
+    # print("Please use scipy version 1.7.3")
+    # exit(1)
+    print(f"{scipy.__version__ = }")
+    raise EnvironmentError("Please use scipy version 1.10.1")
+else:
+    print(f"Using scipy version 1.10.1!")
+
+import sys
+if (sys.version_info.major != 3 or sys.version_info.minor != 8 or sys.version_info.micro != 10):
+    # exit(1)
+    print(f"python version {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+    print(f"{sys.version = }")
+    raise EnvironmentError("Please use Python 3.8.10")
+else:
+    print(f"Using Python 3.8.10!")
+
+# exit(1)
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -37,7 +65,6 @@ from std_msgs.msg import Float64MultiArray
 from transforms3d.euler import quat2euler
 
 import sympy as smp
-import numpy as np
 import math as m
 
 import scipy.integrate as sp_int
@@ -646,6 +673,8 @@ class OffboardControl(Node):
 
 
         reffunc = self.hover_ref_func(1)
+        # reffunc = self.yawing_only()
+
         # reffunc = self.circle_horz_ref_func()
         # reffunc = self.circle_horz_spin_ref_func()
         # reffunc = self.circle_vert_ref_func()

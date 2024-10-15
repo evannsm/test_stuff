@@ -21,34 +21,6 @@ else:
     print("I can see that conda environment 'wardiNN' is activated!!!!")
     print("Ok you're all set :)")
 
-import numpy as np
-if np.__version__ != '1.23.4':
-    # print("Please use numpy version 1.23.4")
-    # exit(1)
-    print(f"{np.__version__ = }")
-    raise EnvironmentError("Please use numpy version 1.23.4")
-else:
-    print(f"Using numpy version 1.23.4!")
-
-import scipy
-if scipy.__version__ != '1.10.1':
-    # print("Please use scipy version 1.7.3")
-    # exit(1)
-    print(f"{scipy.__version__ = }")
-    raise EnvironmentError("Please use scipy version 1.10.1")
-else:
-    print(f"Using scipy version 1.10.1!")
-
-import sys
-if (sys.version_info.major != 3 or sys.version_info.minor != 8 or sys.version_info.micro != 10):
-    # exit(1)
-    print(f"python version {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
-    print(f"{sys.version = }")
-    raise EnvironmentError("Please use Python 3.8.10")
-else:
-    print(f"Using Python 3.8.10!")
-
-# exit(1)
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -70,13 +42,24 @@ import math as m
 import scipy.integrate as sp_int
 import scipy.linalg as sp_linalg
 
-import jax.numpy as jnp
-from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
-from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
+import numpy as np
+if np.__version__ != '1.23.4':
+    # print("Please use numpy version 1.23.4")
+    # exit(1)
+    print(f"{np.__version__ = }")
+    raise EnvironmentError("Please use numpy version 1.23.4")
+else:
+    print(f"Using numpy version 1.23.4!")
+
+if np.__version__ < 1.24:
+    print(f"can't use jax. requires numpy version >= 1.24")
+else:
+    import jax.numpy as jnp
+    from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
+    from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
 
 import time
 import ctypes
-
 
 from pyJoules.handler.csv_handler import CSVHandler
 from pyJoules.device.rapl_device import RaplPackageDomain, RaplCoreDomain
@@ -290,14 +273,17 @@ class OffboardControl(Node):
             else:
                 self.NN.load_state_dict(torch.load('/home/factslabegmc/final_wardi_files/src/quad_newton_raphson/quad_newton_raphson/holybro_ff.pt'))
 
-        if self.pred_type == 3: #Jax Predictor
-            print("Using Jax")
-            if self.nonlin0:
-                print("Using Jax 0 Order Hold Predictor")
-            else:
-                print("Using Jax 1stOrder Hold Predictor")
-                self.udot = np.array([[0, 0, 0, 0]], dtype=np.float64).T
-
+        if np.__version__ >= 1.24:
+            if self.pred_type == 3: #Jax Predictor
+                print("Using Jax")
+                if self.nonlin0:
+                    print("Using Jax 0 Order Hold Predictor")
+                else:
+                    print("Using Jax 1stOrder Hold Predictor")
+                    self.udot = np.array([[0, 0, 0, 0]], dtype=np.float64).T
+        else:
+            print("Can't use Jax. Requires numpy version >= 1.24")
+            exit(1)
 
         self.metadata = np.array(['Sim' if self.sim else 'Hardware',
                                   'Jax' if self.pred_type == 3 else 'NN' if self.pred_type == 2 else 'Linear' if self.pred_type == 1 else 'Nonlinear',

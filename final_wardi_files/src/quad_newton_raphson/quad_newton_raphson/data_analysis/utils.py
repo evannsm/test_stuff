@@ -94,12 +94,12 @@ def make_plot(df):
     axs[1, 2].set_ylim(0,-1*df['z'].min()+.1)
     axs[1, 2].legend()
 
-    # plot time vs solve_time
-    axs[1, 3].plot(df['time'], df['nr_time']* 1e-9, label='solve_time', color='purple')
-    axs[1, 3].set_ylabel('solve_time')
-    axs[1, 3].set_xlabel('time')
-    axs[1, 3].legend()
-    axs[1, 3].set_xlim(x_lim)
+    # # plot time vs solve_time
+    # axs[1, 3].plot(df['time'], df['nr_time']* 1e-9, label='solve_time', color='purple')
+    # axs[1, 3].set_ylabel('solve_time')
+    # axs[1, 3].set_xlabel('time')
+    # axs[1, 3].legend()
+    # axs[1, 3].set_xlim(x_lim)
 
 
 

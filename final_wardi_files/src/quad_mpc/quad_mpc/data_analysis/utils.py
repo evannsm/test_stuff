@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-LOOKAHEAD = 1
+LOOKAHEAD = 300
 
 def rmse(df):
     """
@@ -16,6 +16,8 @@ def rmse(df):
     # Extract actual and reference values as numpy arrays
     actual_values = df[['x', 'y', 'z', 'yaw']].to_numpy()
     reference_values = df[['x_ref', 'y_ref', 'z_ref', 'yaw_ref']].to_numpy()
+    actual_values = actual_values[LOOKAHEAD:, :]
+    reference_values = reference_values[:-LOOKAHEAD, :]
     actual_values[:,3] = actual_values[:,3] * .18
     reference_values[:,3] = reference_values[:,3] * .18
 

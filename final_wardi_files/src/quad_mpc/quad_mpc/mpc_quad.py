@@ -17,7 +17,8 @@ from std_msgs.msg import Float64MultiArray
 from .workingModel import Quadrotor
 from .workingGenMPC import QuadrotorMPC2
 
-# from tf_transformations import euler_from_quaternion
+print(f"new quat conversion")
+from transforms3d.euler import quat2euler
 import transforms3d
 
 import numpy as np
@@ -100,7 +101,9 @@ class OffboardControl(Node):
 ###############################################################################################################################################
 
         # Initialize variables:  
-        self.time_before_land = 30.0
+        self.cushion_time = 10.0
+        self.flight_time = 30.0
+        self.time_before_land = self.flight_time + 2*(self.cushion_time)
         print(f"time_before_land: {self.time_before_land}")
         self.offboard_setpoint_counter = 0 #helps us count 10 cycles of sending offboard heartbeat before switching to offboard mode and arming
         self.vehicle_status = VehicleStatus() #vehicle status variable to make sure we're in offboard mode before sending setpoints
@@ -132,6 +135,7 @@ class OffboardControl(Node):
         num_steps = 20 #10, 20
         self.mpc_solver = QuadrotorMPC2(generate_c_code, quad, horizon, num_steps)
         self.num_steps = num_steps
+        self.horizon = horizon
 
 
         self.metadata = np.array(['Sim' if self.sim else 'Hardware',
@@ -270,178 +274,70 @@ class OffboardControl(Node):
             collective_thrust = a*throttle_command**2 + b*throttle_command + c
             return -collective_thrust
 
-    def euler_from_matrix(self, matrix, axes='sxyz'):
-        """Return Euler angles from rotation matrix for specified axis sequence.
+    # def _reorder_input_quaternion(self, quaternion):
+    #     """Reorder quaternion to have w term first."""
+    #     # x, y, z, w = quaternion
+    #     return quaternion
 
-        axes : One of 24 axis sequences as string or encoded tuple
+    # def quaternion_matrix(self, quaternion):
+    #     """
+    #     Return homogeneous rotation matrix from quaternion.
 
-        Note that many Euler angle triplets can describe one matrix.
+    #     >>> R = quaternion_matrix([0.06146124, 0, 0, 0.99810947])
+    #     >>> numpy.allclose(R, rotation_matrix(0.123, (1, 0, 0)))
+    #     True
 
-        # >>> R0 = euler_matrix(1, 2, 3, 'syxz')
-        # >>> al, be, ga = euler_from_matrix(R0, 'syxz')
-        # >>> R1 = euler_matrix(al, be, ga, 'syxz')
-        # >>> numpy.allclose(R0, R1)
-        # True
-        # >>> angles = (4.0*math.pi) * (numpy.random.random(3) - 0.5)
-        # >>> for axes in _AXES2TUPLE.keys():
-        # ...    R0 = euler_matrix(axes=axes, *angles)
-        # ...    R1 = euler_matrix(axes=axes, *euler_from_matrix(R0, axes))
-        # ...    if not numpy.allclose(R0, R1): print axes, "failed"
+    #     """
+    #     TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
+    #     ROTATION_IDENTITY = np.identity(3, dtype=np.float64)
+    #     ZOOM_IDENTITY = [1.0, 1.0, 1.0]
+    #     SHEAR_IDENTITY = TRANSLATION_IDENTITY
+    #     rotation_matrix = transforms3d.quaternions.quat2mat(
+    #         self._reorder_input_quaternion(quaternion)
+    #     )
+    #     return transforms3d.affines.compose(TRANSLATION_IDENTITY,
+    #                                         rotation_matrix,
+    #                                         ZOOM_IDENTITY)
 
-        # """
+    # def euler_from_matrix(self, matrix, axes='sxyz'):
+    #     """
+    #     Return Euler angles from rotation matrix for specified axis sequence.
 
-        # epsilon for testing whether a number is close to zero
-        _EPS = np.finfo(float).eps * 4.0
+    #     axes : One of 24 axis sequences as string or encoded tuple
 
-        # axis sequences for Euler angles
-        _NEXT_AXIS = [1, 2, 0, 1]
+    #     Note that many Euler angle triplets can describe one matrix.
 
-        # map axes strings to/from tuples of inner axis, parity, repetition, frame
-        _AXES2TUPLE = {
-            'sxyz': (0, 0, 0, 0), 'sxyx': (0, 0, 1, 0), 'sxzy': (0, 1, 0, 0),
-            'sxzx': (0, 1, 1, 0), 'syzx': (1, 0, 0, 0), 'syzy': (1, 0, 1, 0),
-            'syxz': (1, 1, 0, 0), 'syxy': (1, 1, 1, 0), 'szxy': (2, 0, 0, 0),
-            'szxz': (2, 0, 1, 0), 'szyx': (2, 1, 0, 0), 'szyz': (2, 1, 1, 0),
-            'rzyx': (0, 0, 0, 1), 'rxyx': (0, 0, 1, 1), 'ryzx': (0, 1, 0, 1),
-            'rxzx': (0, 1, 1, 1), 'rxzy': (1, 0, 0, 1), 'ryzy': (1, 0, 1, 1),
-            'rzxy': (1, 1, 0, 1), 'ryxy': (1, 1, 1, 1), 'ryxz': (2, 0, 0, 1),
-            'rzxz': (2, 0, 1, 1), 'rxyz': (2, 1, 0, 1), 'rzyz': (2, 1, 1, 1)}
+    #     >>> R0 = euler_matrix(1, 2, 3, 'syxz')
+    #     >>> al, be, ga = euler_from_matrix(R0, 'syxz')
+    #     >>> R1 = euler_matrix(al, be, ga, 'syxz')
+    #     >>> numpy.allclose(R0, R1)
+    #     True
+    #     >>> angles = (4.0*math.pi) * (numpy.random.random(3) - 0.5)
+    #     >>> for axes in _AXES2TUPLE.keys():
+    #     ...    R0 = euler_matrix(axes=axes, *angles)
+    #     ...    R1 = euler_matrix(axes=axes, *euler_from_matrix(R0, axes))
+    #     ...    if not numpy.allclose(R0, R1): print axes, "failed"
 
-        _TUPLE2AXES = dict((v, k) for k, v in _AXES2TUPLE.items())
+    #     """
+    #     return transforms3d.euler.mat2euler(matrix, axes=axes)
 
-        try:
-            firstaxis, parity, repetition, frame = _AXES2TUPLE[axes.lower()]
-        except (AttributeError, KeyError):
-            _ = _TUPLE2AXES[axes]
-            firstaxis, parity, repetition, frame = axes
+    
+    # def euler_from_quaternion(self, quaternion, axes='sxyz'):
+    #     """
+    #     Return Euler angles from quaternion for specified axis sequence.
 
-        i = firstaxis
-        j = _NEXT_AXIS[i+parity]
-        k = _NEXT_AXIS[i-parity+1]
+    #     >>> angles = euler_from_quaternion([0.06146124, 0, 0, 0.99810947])
+    #     >>> numpy.allclose(angles, [0.123, 0, 0])
+    #     True
 
-        M = np.array(matrix, dtype=np.float64, copy=False)[:3, :3]
-        if repetition:
-            sy = m.sqrt(M[i, j]*M[i, j] + M[i, k]*M[i, k])
-            if sy > _EPS:
-                ax = m.atan2( M[i, j],  M[i, k])
-                ay = m.atan2( sy,       M[i, i])
-                az = m.atan2( M[j, i], -M[k, i])
-            else:
-                ax = m.atan2(-M[j, k],  M[j, j])
-                ay = m.atan2( sy,       M[i, i])
-                az = 0.0
-        else:
-            cy = m.sqrt(M[i, i]*M[i, i] + M[j, i]*M[j, i])
-            if cy > _EPS:
-                ax = m.atan2( M[k, j],  M[k, k])
-                ay = m.atan2(-M[k, i],  cy)
-                az = m.atan2( M[j, i],  M[i, i])
-            else:
-                ax = m.atan2(-M[j, k],  M[j, j])
-                ay = m.atan2(-M[k, i],  cy)
-                az = 0.0
-
-        if parity:
-            ax, ay, az = -ax, -ay, -az
-        if frame:
-            ax, az = az, ax
-        return ax, ay, az
-
-    def quaternion_matrix(self, quaternion):
-        """Return homogeneous rotation matrix from quaternion.
-
-        >>> R = quaternion_matrix([0.06146124, 0, 0, 0.99810947])
-        >>> numpy.allclose(R, rotation_matrix(0.123, (1, 0, 0)))
-        True
-
-        """
-        _EPS = np.finfo(float).eps * 4.0
-
-        q = np.array(quaternion[:4], dtype=np.float64, copy=True)
-        nq = np.dot(q, q)
-        if nq < _EPS:
-            return np.identity(4)
-        q *= m.sqrt(2.0 / nq)
-        q = np.outer(q, q)
-        return np.array((
-            (1.0-q[1, 1]-q[2, 2],     q[0, 1]-q[2, 3],     q[0, 2]+q[1, 3], 0.0),
-            (    q[0, 1]+q[2, 3], 1.0-q[0, 0]-q[2, 2],     q[1, 2]-q[0, 3], 0.0),
-            (    q[0, 2]-q[1, 3],     q[1, 2]+q[0, 3], 1.0-q[0, 0]-q[1, 1], 0.0),
-            (                0.0,                 0.0,                 0.0, 1.0)
-            ), dtype=np.float64)
-
-    def euler_from_quaternion(self, quaternion, axes='sxyz'):
-        """Return Euler angles from quaternion for specified axis sequence.
-
-        >>> angles = euler_from_quaternion([0.06146124, 0, 0, 0.99810947])
-        >>> numpy.allclose(angles, [0.123, 0, 0])
-        True
-
-        """
-        return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
+    #     """
+    #     return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
+    
 
     def normalize_angle(self, angle):
         """ Normalize the angle to the range [-pi, pi]. """
         return m.atan2(m.sin(angle), m.cos(angle))
 
-    def _reorder_input_quaternion(self, quaternion):
-        """Reorder quaternion to have w term first."""
-        # x, y, z, w = quaternion
-        return quaternion
-
-    def quaternion_matrix(self, quaternion):
-        """
-        Return homogeneous rotation matrix from quaternion.
-
-        >>> R = quaternion_matrix([0.06146124, 0, 0, 0.99810947])
-        >>> numpy.allclose(R, rotation_matrix(0.123, (1, 0, 0)))
-        True
-
-        """
-        TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
-        ROTATION_IDENTITY = np.identity(3, dtype=np.float64)
-        ZOOM_IDENTITY = [1.0, 1.0, 1.0]
-        SHEAR_IDENTITY = TRANSLATION_IDENTITY
-        rotation_matrix = transforms3d.quaternions.quat2mat(
-            self._reorder_input_quaternion(quaternion)
-        )
-        return transforms3d.affines.compose(TRANSLATION_IDENTITY,
-                                            rotation_matrix,
-                                            ZOOM_IDENTITY)
-
-    def euler_from_matrix(self, matrix, axes='sxyz'):
-        """
-        Return Euler angles from rotation matrix for specified axis sequence.
-
-        axes : One of 24 axis sequences as string or encoded tuple
-
-        Note that many Euler angle triplets can describe one matrix.
-
-        >>> R0 = euler_matrix(1, 2, 3, 'syxz')
-        >>> al, be, ga = euler_from_matrix(R0, 'syxz')
-        >>> R1 = euler_matrix(al, be, ga, 'syxz')
-        >>> numpy.allclose(R0, R1)
-        True
-        >>> angles = (4.0*math.pi) * (numpy.random.random(3) - 0.5)
-        >>> for axes in _AXES2TUPLE.keys():
-        ...    R0 = euler_matrix(axes=axes, *angles)
-        ...    R1 = euler_matrix(axes=axes, *euler_from_matrix(R0, axes))
-        ...    if not numpy.allclose(R0, R1): print axes, "failed"
-
-        """
-        return transforms3d.euler.mat2euler(matrix, axes=axes)
-
-
-    def euler_from_quaternion(self, quaternion, axes='sxyz'):
-        """
-        Return Euler angles from quaternion for specified axis sequence.
-
-        >>> angles = euler_from_quaternion([0.06146124, 0, 0, 0.99810947])
-        >>> numpy.allclose(angles, [0.123, 0, 0])
-        True
-
-        """
-        return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
 
     def adjust_yaw(self, yaw):
         mocap_psi = yaw
@@ -480,7 +376,8 @@ class OffboardControl(Node):
         self.vy = msg.velocity[1]
         self.vz = msg.velocity[2]
 
-        self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
+        # self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
+        self.roll, self.pitch, yaw = quat2euler(msg.q)
         self.yaw = self.adjust_yaw(yaw)
 
         self.p = msg.angular_velocity[0]
@@ -594,19 +491,22 @@ class OffboardControl(Node):
 
 
 #~~~~~~~~~~~~~~~ Calculate reference trajectory ~~~~~~~~~~~~~~~
-        # if self.time_from_start <= 10.0:
-        #     reffunc = self.hover_ref_func(1)
-        # else:
-        #     reffunc = self.circle_horz_ref_func()
-        #     reffunc = self.circle_horz_spin_ref_func()
-        #     reffunc = self.circle_vert_ref_func()
-        #     reffunc = self.fig8_horz_ref_func()
-        #     reffunc = self.fig8_vert_ref_func_short()
-        #     reffunc = self.fig8_vert_ref_func_tall()
-        #     reffunc = self.helix()
-        #     reffunc = self.helix_spin
+        if self.time_from_start <= self.cushion_time:
+            reffunc = self.hover_ref_func(1)
+        elif self.cushion_time < self.time_from_start < self.cushion_time + self.flight_time:
+            # reffunc = self.circle_horz_ref_func()
+            reffunc = self.circle_horz_spin_ref_func()
+            # reffunc = self.circle_vert_ref_func()
+            # reffunc = self.fig8_horz_ref_func()
+            # reffunc = self.fig8_vert_ref_func_short()
+            # reffunc = self.fig8_vert_ref_func_tall()
+            # reffunc = self.helix()
+            # reffunc = self.helix_spin()
+        elif self.cushion_time + self.flight_time <= self.time_from_start <= self.time_before_land:
+            reffunc = self.hover_ref_func(1)
+        else:
+            reffunc = self.hover_ref_func(1)
 
-        # reffunc = self.yawing_only()
         # reffunc = self.hover_ref_func(1)
         # reffunc = self.circle_horz_ref_func()
         # reffunc = self.circle_horz_spin_ref_func()
@@ -615,7 +515,9 @@ class OffboardControl(Node):
         # reffunc = self.fig8_vert_ref_func_short()
         # reffunc = self.fig8_vert_ref_func_tall()
         # reffunc = self.helix()
-        reffunc = self.helix_spin()
+        # reffunc = self.helix_spin()
+        # reffunc = self.yawing_only()
+
         print(f"reffunc: {reffunc[:,0]}")
 
         # Calculate the MPC control input and transform the force into a throttle command for publishing to the vehicle
@@ -641,7 +543,7 @@ class OffboardControl(Node):
         self.publish_rates_setpoint(final[0], final[1], final[2], final[3])
 
         # Log the states, inputs, and reference trajectories for data analysis
-        state_input_ref_log_info = [float(self.x), float(self.y), float(self.z), float(self.yaw), float(final[0]), float(final[1]), float(final[2]), float(final[3]), float(reffunc[0][0]), float(reffunc[1][0]), float(reffunc[2][0]), float(reffunc[-1][0]), self.time_from_start]
+        state_input_ref_log_info = [float(self.x), float(self.y), float(self.z), float(self.yaw), float(final[0]), float(final[1]), float(final[2]), float(final[3]), float(reffunc[0][-1]), float(reffunc[1][-1]), float(reffunc[2][-1]), float(reffunc[-1][-1]), self.time_from_start]
         self.update_logged_data(state_input_ref_log_info)
         # self.state_input_ref_log_msg.data = [float(self.x), float(self.y), float(self.z), float(self.yaw), float(final[0]), float(final[1]), float(final[2]), float(final[3]), float(reffunc[0][0]), float(reffunc[1][0]), float(reffunc[2][0]), float(reffunc[3][0])]
         # self.state_input_ref_log_publisher_.publish(self.state_input_ref_log_msg)
@@ -725,310 +627,270 @@ class OffboardControl(Node):
         r_final = np.tile(r, (1, self.num_steps))
         return r_final
     
-    def circle_horz_ref_func(self): #Returns Circle Reference Trajectory in Horizontal Plane ([x,y,z,yaw])
+    def circle_horz_ref_func(self):
         """ Returns circle reference trajectory in horizontal plane. """
         print("circle_horz_ref_func")
 
-        t = self.time_from_start + self.T_lookahead
-        PERIOD = 13 # if you make it 30s itll track well but it can't go much faster. used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
-        w = 2*m.pi / PERIOD
+        # Generate a time array for the trajectory
+        t_start = self.time_from_start
+        t = np.linspace(t_start, t_start + self.horizon, self.num_steps)
 
-        x = .6*m.cos(w*t)
-        y = .6*m.sin(w*t)
-        z = -0.8
-        vx = 0.0
-        vy = 0.0
-        vz = 0.0
-        roll = 0.0
-        pitch = 0.0
-        yaw = 0.0
+        PERIOD = 13
+        w = 2 * np.pi / PERIOD
 
-        r = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
-        r_final = np.tile(r, (1, self.num_steps))
+        # Compute trajectory components as arrays
+        x = 0.6 * np.cos(w * t).reshape(-1)
+        y = 0.6 * np.sin(w * t).reshape(-1)
+        z = -0.8 * np.ones(self.num_steps).reshape(-1)
+        vx = np.zeros(self.num_steps).reshape(-1)
+        vy = np.zeros(self.num_steps).reshape(-1)
+        vz = np.zeros(self.num_steps).reshape(-1)
+        roll = np.zeros(self.num_steps).reshape(-1)
+        pitch = np.zeros(self.num_steps).reshape(-1)
+        yaw = np.zeros(self.num_steps).reshape(-1)
 
-        return r_final
+        # Construct the reference trajectory array
+        r = np.array([x, y, z, vx, vy, vz, roll, pitch, yaw])
+
+        return r
+
     
 
     def circle_horz_spin_ref_func(self): #Returns Circle Reference Trajectory in Horizontal Plane while Yawing([x,y,z,yaw])
         """ Returns circle reference trajectory in horizontal plane while yawing. """
         print("circle_horz_spin_ref_func")
 
-        t = self.time_from_start + self.T_lookahead
+        t = self.time_from_start
+        t = np.linspace(t, t+self.horizon, self.num_steps)
+
         PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
-        w = 2*m.pi / PERIOD
+        w = 2*np.pi / PERIOD
 
         SPIN_PERIOD = 15
-        yaw_ref = t / (SPIN_PERIOD / (2*m.pi))
-        x = .6*m.cos(w*t)
-        y = .6*m.sin(w*t)
-        z = -0.8
-        vx = 0.0
-        vy = 0.0
-        vz = 0.0
-        roll = 0.0
-        pitch = 0.0
-        yaw = yaw_ref
+        yaw_ref = (t - self.cushion_time) / (SPIN_PERIOD / (2*m.pi))
 
-        r = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
-        r_final = np.tile(r, (1, self.num_steps))
-        return r_final
+        x = .6*np.cos(w*t).reshape(-1)
+        y = .6*np.sin(w*t).reshape(-1)
+        z = -0.8*np.ones(self.num_steps).reshape(-1)
+        vx = 0.0 * np.ones(self.num_steps).reshape(-1)
+        vy = 0.0 * np.ones(self.num_steps).reshape(-1)
+        vz = 0.0 * np.ones(self.num_steps).reshape(-1)
+        roll = 0.0 * np.ones(self.num_steps).reshape(-1)
+        pitch = 0.0 * np.ones(self.num_steps).reshape(-1)
+        yaw = yaw_ref * np.ones(self.num_steps).reshape(-1)
+
+        r = np.array([x, y, z, vx, vy, vz, roll, pitch, yaw])
+
+        return r
     
-    def circle_vert_ref_func(self): #Returns Circle Reference Trajectory in Vertical Plane ([x,y,z,yaw])
-        """ Returns circle reference trajectory in horizontal plane. """        
+
+    def circle_vert_ref_func(self):
+        """ Returns circle reference trajectory in vertical plane. """        
         print("circle_vert_ref_func")
 
-        t = self.time_from_start + self.T_lookahead
-        PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
-        w = 2*m.pi / PERIOD
+        # Generate a time array for the trajectory
+        t_start = self.time_from_start
+        t = np.linspace(t_start, t_start + self.horizon, self.num_steps)
 
-        x = 0.0
-        y = .35*m.cos(w*t)
-        z = -1*( .35*m.sin(w*t) + .75 )
-        vx = 0.0
-        vy = 0.0
-        vz = 0.0
-        roll = 0.0
-        pitch = 0.0
-        yaw = 0.0
+        PERIOD = 13
+        w = 2 * np.pi / PERIOD
 
-        r = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
-        r_final = np.tile(r, (1, self.num_steps))
-        return r_final
+        # Compute trajectory components as arrays
+        x = np.zeros(self.num_steps).reshape(-1)
+        y = 0.35 * np.cos(w * t).reshape(-1)
+        z = -1 * (0.35 * np.sin(w * t) + 0.75).reshape(-1)
+        vx = np.zeros(self.num_steps).reshape(-1)
+        vy = np.zeros(self.num_steps).reshape(-1)
+        vz = np.zeros(self.num_steps).reshape(-1)
+        roll = np.zeros(self.num_steps).reshape(-1)
+        pitch = np.zeros(self.num_steps).reshape(-1)
+        yaw = np.zeros(self.num_steps).reshape(-1)
+
+        # Construct the reference trajectory array
+        r = np.array([x, y, z, vx, vy, vz, roll, pitch, yaw])
+
+        return r
+
     
-
-    
-    def fig8_horz_ref_func(self): #Returns Figure 8 Reference Trajectory in Horizontal Plane ([x,y,z,yaw])
+    def fig8_horz_ref_func(self):
         """ Returns figure 8 reference trajectory in horizontal plane. """
         print("fig8_horz_ref_func")
 
-        t = self.time_from_start + self.T_lookahead
-        PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
-        w = 2*m.pi / PERIOD
+        # Generate a time array for the trajectory
+        t_start = self.time_from_start
+        t = np.linspace(t_start, t_start + self.horizon, self.num_steps)
 
-        x = .35*m.sin(2*w*t)
-        y = .35*m.sin(w*t)
-        z = -0.8
-        vx = 0.0
-        vy = 0.0
-        vz = 0.0
-        roll = 0.0
-        pitch = 0.0
-        yaw = 0.0
+        PERIOD = 13
+        w = 2 * np.pi / PERIOD
 
-        r = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
-        r_final = np.tile(r, (1, self.num_steps))
+        # Compute trajectory components as arrays
+        x = 0.35 * np.sin(2 * w * t).reshape(-1)
+        y = 0.35 * np.sin(w * t).reshape(-1)
+        z = -0.8 * np.ones(self.num_steps).reshape(-1)
+        vx = np.zeros(self.num_steps).reshape(-1)
+        vy = np.zeros(self.num_steps).reshape(-1)
+        vz = np.zeros(self.num_steps).reshape(-1)
+        roll = np.zeros(self.num_steps).reshape(-1)
+        pitch = np.zeros(self.num_steps).reshape(-1)
+        yaw = np.zeros(self.num_steps).reshape(-1)
 
-        return r_final
+        # Construct the reference trajectory array
+        r = np.array([x, y, z, vx, vy, vz, roll, pitch, yaw])
+
+        return r
+
     
-    def fig8_vert_ref_func_short(self): #Returns A Short Figure 8 Reference Trajectory in Vertical Plane ([x,y,z,yaw])
+    def fig8_vert_ref_func_short(self):
         """ Returns a short figure 8 reference trajectory in vertical plane. """
-        print(f"fig8_vert_ref_func_short")
+        print("fig8_vert_ref_func_short")
 
-        t = self.time_from_start + self.T_lookahead
-        PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
-        w = 2*m.pi / PERIOD
+        # Generate a time array for the trajectory
+        t_start = self.time_from_start
+        t = np.linspace(t_start, t_start + self.horizon, self.num_steps)
 
-        x = 0.0
-        y = .35*m.sin(w*t)
-        z = -1*(.35*m.sin(2*w*t) + 0.8)
-        vx = 0.0
-        vy = 0.0
-        vz = 0.0
-        roll = 0.0
-        pitch = 0.0
-        yaw = 0.0
+        PERIOD = 13
+        w = 2 * np.pi / PERIOD
 
-        r = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
-        r_final = np.tile(r, (1, self.num_steps))
+        # Compute trajectory components as arrays
+        x = np.zeros(self.num_steps).reshape(-1)
+        y = 0.35 * np.sin(w * t).reshape(-1)
+        z = -1 * (0.35 * np.sin(2 * w * t) + 0.8).reshape(-1)
+        vx = np.zeros(self.num_steps).reshape(-1)
+        vy = np.zeros(self.num_steps).reshape(-1)
+        vz = np.zeros(self.num_steps).reshape(-1)
+        roll = np.zeros(self.num_steps).reshape(-1)
+        pitch = np.zeros(self.num_steps).reshape(-1)
+        yaw = np.zeros(self.num_steps).reshape(-1)
 
-        return r_final
+        # Construct the reference trajectory array
+        r = np.array([x, y, z, vx, vy, vz, roll, pitch, yaw])
+
+        return r
+
     
-    def fig8_vert_ref_func_tall(self): #Returns A Tall Figure 8 Reference Trajectory in Vertical Plane ([x,y,z,yaw])
+    def fig8_vert_ref_func_tall(self):
         """ Returns a tall figure 8 reference trajectory in vertical plane. """
-        print(f"fig8_vert_ref_func_tall")
+        print("fig8_vert_ref_func_tall")
 
-        t = self.time_from_start + self.T_lookahead
-        PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
-        w = 2*m.pi / PERIOD
+        # Generate a time array for the trajectory
+        t_start = self.time_from_start
+        t = np.linspace(t_start, t_start + self.horizon, self.num_steps)
 
-        x = 0.0
-        y = .35*m.sin(2*w*t)
-        z = -1*(.35*m.sin(w*t)+0.8)
-        vx = 0.0
-        vy = 0.0
-        vz = 0.0
-        roll = 0.0
-        pitch = 0.0
-        yaw = 0.0
+        PERIOD = 13
+        w = 2 * np.pi / PERIOD
 
-        r = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
-        r_final = np.tile(r, (1, self.num_steps))
+        # Compute trajectory components as arrays
+        x = np.zeros(self.num_steps).reshape(-1)
+        y = 0.35 * np.sin(2 * w * t).reshape(-1)
+        z = -1 * (0.35 * np.sin(w * t) + 0.8).reshape(-1)
+        vx = np.zeros(self.num_steps).reshape(-1)
+        vy = np.zeros(self.num_steps).reshape(-1)
+        vz = np.zeros(self.num_steps).reshape(-1)
+        roll = np.zeros(self.num_steps).reshape(-1)
+        pitch = np.zeros(self.num_steps).reshape(-1)
+        yaw = np.zeros(self.num_steps).reshape(-1)
 
-        return r_final
+        # Construct the reference trajectory array
+        r = np.array([x, y, z, vx, vy, vz, roll, pitch, yaw])
 
-    def helix(self): #Returns Helix Reference Trajectory ([x,y,z,yaw])
+        return r
+
+
+    def helix(self):
         """ Returns helix reference trajectory. """
-        print(f"helix")
+        print("helix")
         
-        t = self.time_from_start + self.T_lookahead
-        PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
-        w = 2*m.pi / PERIOD
+        # Generate a time array for the trajectory
+        t_start = self.time_from_start
+        t = np.linspace(t_start, t_start + self.horizon, self.num_steps)
+        
+        PERIOD = 13
+        w = 2 * np.pi / PERIOD
         
         PERIOD_Z = 13
-        w_z = 2*m.pi / PERIOD_Z
+        w_z = 2 * np.pi / PERIOD_Z
         z0 = 0.7
         height_variance = 0.3
 
-        x = .6*m.cos(w*t)
-        y = .6*m.sin(w*t)
-        z = -1 * (z0 + height_variance * m.sin(w_z * t))
-        vx = 0.0
-        vy = 0.0
-        vz = 0.0
-        roll = 0.0
-        pitch = 0.0
-        yaw = 0.0
+        # Compute trajectory components as arrays
+        x = 0.6 * np.cos(w * t).reshape(-1)
+        y = 0.6 * np.sin(w * t).reshape(-1)
+        z = -1 * (z0 + height_variance * np.sin(w_z * t)).reshape(-1)
+        vx = np.zeros(self.num_steps).reshape(-1)
+        vy = np.zeros(self.num_steps).reshape(-1)
+        vz = np.zeros(self.num_steps).reshape(-1)
+        roll = np.zeros(self.num_steps).reshape(-1)
+        pitch = np.zeros(self.num_steps).reshape(-1)
+        yaw = np.zeros(self.num_steps).reshape(-1)
 
-        r = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
-        r_final = np.tile(r, (1, self.num_steps))
+        # Construct the reference trajectory array
+        r = np.array([x, y, z, vx, vy, vz, roll, pitch, yaw])
 
-        return r_final
+        return r
+
     
     def helix_spin(self):
         """ Returns helix reference trajectory while yawing. """
-        print(f"helix_spin")
+        print("helix_spin")
         
-        t = self.time_from_start + self.T_lookahead
+        # Generate a time array for the trajectory
+        t_start = self.time_from_start
+        t = np.linspace(t_start, t_start + self.horizon, self.num_steps)
+        
         PERIOD = 13
-        w = 2*m.pi / PERIOD
+        w = 2 * np.pi / PERIOD
 
         PERIOD_Z = 13
-        w_z = 2*m.pi / PERIOD_Z
+        w_z = 2 * np.pi / PERIOD_Z
         z0 = 0.7
         height_variance = 0.3
 
         SPIN_PERIOD = 15
-        yaw_ref = t / (SPIN_PERIOD / (2*m.pi))
+        yaw_ref = (t - self.cushion_time) / (SPIN_PERIOD / (2*m.pi))
 
-        x = .6*m.cos(w*t)
-        y = .6*m.sin(w*t)
-        z = -1 * (z0 + height_variance * m.sin(w_z * t))
-        vx = 0.0
-        vy = 0.0
-        vz = 0.0
-        roll = 0.0
-        pitch = 0.0
-        yaw = yaw_ref
+        # Compute trajectory components as arrays
+        x = 0.6 * np.cos(w * t).reshape(-1)
+        y = 0.6 * np.sin(w * t).reshape(-1)
+        z = -1 * (z0 + height_variance * np.sin(w_z * t)).reshape(-1)
+        vx = np.zeros(self.num_steps).reshape(-1)
+        vy = np.zeros(self.num_steps).reshape(-1)
+        vz = np.zeros(self.num_steps).reshape(-1)
+        roll = np.zeros(self.num_steps).reshape(-1)
+        pitch = np.zeros(self.num_steps).reshape(-1)
+        yaw = yaw_ref.reshape(-1)
 
-        r = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
-        r_final = np.tile(r, (1, self.num_steps))
+        # Construct the reference trajectory array
+        r = np.array([x, y, z, vx, vy, vz, roll, pitch, yaw])
 
-        return r_final
+        return r
+
     
-    def yawing_only(self): #Returns Yawing Reference Trajectory ([x,y,z,yaw])
+    def yawing_only(self):
         """ Returns yawing reference trajectory. """
-        print(f"yawing_only")
-        t = self.time_from_start + self.T_lookahead
+        print("yawing_only")
 
-        SPIN_PERIOD = 7
-        yaw_ref = t / (SPIN_PERIOD / (2*m.pi))
+        # Generate a time array for the trajectory
+        t_start = self.time_from_start
+        t = np.linspace(t_start, t_start + self.horizon, self.num_steps)
 
-        r = np.array([[0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, yaw_ref]]).T
-        r_final = np.tile(r, (1, self.num_steps))
+        SPIN_PERIOD = 15
+        yaw_ref = (t - self.cushion_time) / (SPIN_PERIOD / (2*m.pi))
 
-        return r_final
+        # All other components remain constant
+        x = np.zeros(self.num_steps).reshape(-1)
+        y = np.zeros(self.num_steps).reshape(-1)
+        z = -0.5 * np.ones(self.num_steps).reshape(-1)
+        vx = np.zeros(self.num_steps).reshape(-1)
+        vy = np.zeros(self.num_steps).reshape(-1)
+        vz = np.zeros(self.num_steps).reshape(-1)
+        roll = np.zeros(self.num_steps).reshape(-1)
+        pitch = np.zeros(self.num_steps).reshape(-1)
+        yaw = yaw_ref.reshape(-1)
 
+        # Construct the reference trajectory array
+        r = np.array([x, y, z, vx, vy, vz, roll, pitch, yaw])
 
-    def spiral_staircases_old(self, num):
-        if not self.sim:
-            print("spiral trajectories not YET available for hardware")
-            if num > 3:
-                print("spiral modes above 3 not available for hardware")
-                exit(1)
-            exit(1)
-
-        t = self.time_from_start + self.T_lookahead  
-
-        # For x and y elements of spiral staircase
-        amplitude_xy = 0.8
-        desired_xy_period = 4 #6+ for hardware
-        w_xy = (2*m.pi) / desired_xy_period
-
-        # For height element of spiral staircase 
-        amplitude_h = 0.8
-        buffer = 0.4
-        desired_rise_period = desired_xy_period * 2.5 #3+ for hardware with 6+ for xy period
-        w_rise = (2*m.pi) / desired_rise_period
-
-        # For Yawing while spiraling
-        desired_yaw_period = desired_xy_period * 2
-        w_yaw = (2*m.pi) / desired_yaw_period
-
-        circle_period_hardware = 11 # maybe 8?
-        w_xy_hardware = 2*m.pi / circle_period_hardware
-
-        vert_period_hardware = circle_period_hardware * 3
-        w_vert_hardware = 2*m.pi / vert_period_hardware
-
-        yaw_multiplier_hardware = 1.5 #maybe 2, or 1.5 if you get brave
-        w_yaw_hardware = 2*m.pi / (circle_period_hardware*3*yaw_multiplier_hardware)
-
-        spiral_dict = { #4+ are for sim only in case any of this makes it onto hardware
-            1: np.array([[0.0, 0.0, -1*( -.8*m.sin((2*m.pi/(6*3))*t) + (0.8+0.4) ),     0.0, 0.0, 0.0,   0.0, 0.0, 0.0]]).T,
-            2: np.array([[0.8*m.cos(w_xy_hardware*t), 0.8*m.sin(w_xy_hardware*t), -1*( 0.8*m.sin(w_vert_hardware*t) + (0.8+0.4) ),     0.0, 0.0, 0.0,   0.0, 0.0, 0.0]]).T,
-            3: np.array([[0.8*m.cos(w_xy_hardware*t), 0.8*m.sin(w_xy_hardware*t), -1*( 0.8*m.sin(w_vert_hardware*t) + (0.8+0.4) ),     0.0, 0.0, 0.0,   0.0, 0.0, w_yaw_hardware*t]]).T,
-            4: np.array([[0.8*m.cos((2*m.pi/4)*t), 0.8*m.sin((2*m.pi/4)*t), -1*( 0.8*m.sin((2*m.pi/(4*2.5))*t) + (0.8+0.4) ),     0.0, 0.0, 0.0,   0.0, 0.0, 0.0]]).T,
-            5: np.array([[0.8*m.cos((2*m.pi/4)*t), 0.8*m.sin((2*m.pi/4)*t), -1*( 0.8*m.sin((2*m.pi/(4*2.5))*t) + (0.8+0.4) ),     0.0, 0.0, 0.0,   0.0, 0.0, (2*m.pi/ (4*2.5*2.5))*t]]).T,
-            6: np.array([[amplitude_xy*m.cos(w_xy*t), amplitude_xy*m.sin(w_xy*t), -1*( amplitude_h*m.sin(w_rise*t) + (amplitude_h+buffer) ),     0.0, 0.0, 0.0,   0.0, 0.0, w_yaw*t]]).T,
-        }
-
-
-        if num > len(spiral_dict) or num < 1:
-            print(f"spiral_dict #{num} not found")
-            exit(0)
-    
-        print(f"spiral_dict #{num}")
-
-        r = spiral_dict.get(num)
-        r_final = np.tile(r, (1, self.num_steps))
-        return r_final
-    
-    def yaw_ref_old(self, num):
-        if not self.sim:
-            print("changing yaw not YET available for hardware")
-            if num > 3:
-                print("yaw modes above 3 not available for hardware")
-                exit(1)
-            exit(1)      
-        t = self.time_from_start + self.T_lookahead
-
-        # For Yawing
-        desired_yaw_period = 6
-        w_yaw = (2*m.pi) / desired_yaw_period
-
-        # For circles while yawing
-        amplitude_xy = 0.8
-        desired_xy_period = 6 #6+ for hardware
-        w_xy = (2*m.pi) / desired_xy_period
-
-        hardware_period = 11 # maybe 8?
-        w_xy_hardware = 2*m.pi / hardware_period
-        yaw_hardware_multiplier = 1.5 #maybe 2, or 1.5 if you get brave
-        w_yaw_hardware = 2*m.pi / (hardware_period*3*yaw_hardware_multiplier)
-        yaw_dict = {
-            1: np.array([[0.0, 0.0, -0.6,     0.0, 0.0, 0.0,   0.0, 0.0, w_yaw_hardware*t]]).T,
-            2: np.array([[0.8, 0.8, -0.8,     0.0, 0.0, 0.0,   0.0, 0.0, w_yaw_hardware*t]]).T,
-            3: np.array([[0.8*m.cos(w_xy_hardware*t), 0.8*m.sin(w_xy_hardware*t), -0.8,     0.0, 0.0, 0.0,   0.0, 0.0, w_yaw_hardware*t]]).T,
-            4: np.array([[amplitude_xy*m.cos(w_xy*t), amplitude_xy*m.sin(w_xy*t), -0.8,     0.0, 0.0, 0.0,   0.0, 0.0, w_yaw*t]]).T,
-        }
-        if num > len(yaw_dict) or num < 1:
-            print(f"yaw_dict #{num} not found")
-            exit(1)
-    
-        r = yaw_dict.get(num)
-        r_final = np.tile(r, (1, self.num_steps))
-        return r_final
-
+        return r
 
 
 # ~~ Entry point of the code -> Initializes the node and spins it. Also handles exceptions and logging ~~

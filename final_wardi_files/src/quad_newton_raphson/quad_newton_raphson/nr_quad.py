@@ -29,6 +29,8 @@ import scipy.linalg as sp_linalg
 import jax.numpy as jnp
 from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
 from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
+print(f"new quat conversion")
+from transforms3d.euler import quat2euler
 
 import time
 import ctypes
@@ -113,7 +115,9 @@ class OffboardControl(Node):
 ###############################################################################################################################################
 
         # Initialize variables:
-        self.time_before_land = 30.0
+        self.cushion_time = 10.0
+        self.flight_time = 30.0
+        self.time_before_land = self.flight_time + 2*(self.cushion_time)
         print(f"time_before_land: {self.time_before_land}")
         self.offboard_setpoint_counter = 0 #helps us count 10 cycles of sending offboard heartbeat before switching to offboard mode and arming
         self.vehicle_status = VehicleStatus() #vehicle status variable to make sure we're in offboard mode before sending setpoints
@@ -125,7 +129,7 @@ class OffboardControl(Node):
 
         if self.sim:
             print("Using simulator throttle from force conversion function")
-            self.MASS = 1.535 #set simulation mass from iris model sdf for linearized model calculations
+            self.MASS = 1.5 #set simulation mass from iris model sdf for linearized model calculations
             # The following 3 variables are used to convert between force and throttle commands for the iris drone defined in PX4 stack for gazebo simulation
             self.MOTOR_CONSTANT = 0.00000584 #iris gazebo simulation motor constant
             self.MOTOR_VELOCITY_ARMED = 100 #iris gazebo motor velocity when armed
@@ -152,9 +156,9 @@ class OffboardControl(Node):
 
         self.C = self.observer_matrix() #Calculate Observer Matrix Needed After Predictions of all States to Get Only the States We Need in Output
 
-        self.nonlin0 = False
-        if self.pred_type == 0 or self.pred_type == 3: #Nonlinear Predictor
-            self.nonlin0 = True # use 1st order hold for now
+        # self.nonlin0 = False
+        if self.pred_type == 0 or self.pred_type == 3: #For Nonlinear & Jax Predictors
+            self.nonlin0 = False # use 0-order hold for now
             # self.nonlin0 = not bool(int(input("Press 0 for 0-Order Hold and 1 for 1st-Order Hold: ")))
 
         if self.pred_type == 0: #Nonlinear Predictor
@@ -245,6 +249,7 @@ class OffboardControl(Node):
             else:
                 print("Using Jax 1stOrder Hold Predictor")
                 self.udot = np.array([[0, 0, 0, 0]], dtype=np.float64).T
+
 
         self.metadata = np.array(['Sim' if self.sim else 'Hardware',
                                   'Jax' if self.pred_type == 3 else 'NN' if self.pred_type == 2 else 'Linear' if self.pred_type == 1 else 'Nonlinear',
@@ -386,64 +391,64 @@ class OffboardControl(Node):
         """ Normalize the angle to the range [-pi, pi]. """
         return m.atan2(m.sin(angle), m.cos(angle))
 
-    def _reorder_input_quaternion(self, quaternion):
-        """Reorder quaternion to have w term first."""
-        # x, y, z, w = quaternion
-        return quaternion
+    # def _reorder_input_quaternion(self, quaternion):
+    #     """Reorder quaternion to have w term first."""
+    #     # x, y, z, w = quaternion
+    #     return quaternion
 
-    def quaternion_matrix(self, quaternion):
-        """
-        Return homogeneous rotation matrix from quaternion.
+    # def quaternion_matrix(self, quaternion):
+    #     """
+    #     Return homogeneous rotation matrix from quaternion.
 
-        >>> R = quaternion_matrix([0.06146124, 0, 0, 0.99810947])
-        >>> numpy.allclose(R, rotation_matrix(0.123, (1, 0, 0)))
-        True
+    #     >>> R = quaternion_matrix([0.06146124, 0, 0, 0.99810947])
+    #     >>> numpy.allclose(R, rotation_matrix(0.123, (1, 0, 0)))
+    #     True
 
-        """
-        TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
-        ROTATION_IDENTITY = np.identity(3, dtype=np.float64)
-        ZOOM_IDENTITY = [1.0, 1.0, 1.0]
-        SHEAR_IDENTITY = TRANSLATION_IDENTITY
-        rotation_matrix = transforms3d.quaternions.quat2mat(
-            self._reorder_input_quaternion(quaternion)
-        )
-        return transforms3d.affines.compose(TRANSLATION_IDENTITY,
-                                            rotation_matrix,
-                                            ZOOM_IDENTITY)
+    #     """
+    #     TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
+    #     ROTATION_IDENTITY = np.identity(3, dtype=np.float64)
+    #     ZOOM_IDENTITY = [1.0, 1.0, 1.0]
+    #     SHEAR_IDENTITY = TRANSLATION_IDENTITY
+    #     rotation_matrix = transforms3d.quaternions.quat2mat(
+    #         self._reorder_input_quaternion(quaternion)
+    #     )
+    #     return transforms3d.affines.compose(TRANSLATION_IDENTITY,
+    #                                         rotation_matrix,
+    #                                         ZOOM_IDENTITY)
 
-    def euler_from_matrix(self, matrix, axes='sxyz'):
-        """
-        Return Euler angles from rotation matrix for specified axis sequence.
+    # def euler_from_matrix(self, matrix, axes='sxyz'):
+    #     """
+    #     Return Euler angles from rotation matrix for specified axis sequence.
 
-        axes : One of 24 axis sequences as string or encoded tuple
+    #     axes : One of 24 axis sequences as string or encoded tuple
 
-        Note that many Euler angle triplets can describe one matrix.
+    #     Note that many Euler angle triplets can describe one matrix.
 
-        >>> R0 = euler_matrix(1, 2, 3, 'syxz')
-        >>> al, be, ga = euler_from_matrix(R0, 'syxz')
-        >>> R1 = euler_matrix(al, be, ga, 'syxz')
-        >>> numpy.allclose(R0, R1)
-        True
-        >>> angles = (4.0*math.pi) * (numpy.random.random(3) - 0.5)
-        >>> for axes in _AXES2TUPLE.keys():
-        ...    R0 = euler_matrix(axes=axes, *angles)
-        ...    R1 = euler_matrix(axes=axes, *euler_from_matrix(R0, axes))
-        ...    if not numpy.allclose(R0, R1): print axes, "failed"
+    #     >>> R0 = euler_matrix(1, 2, 3, 'syxz')
+    #     >>> al, be, ga = euler_from_matrix(R0, 'syxz')
+    #     >>> R1 = euler_matrix(al, be, ga, 'syxz')
+    #     >>> numpy.allclose(R0, R1)
+    #     True
+    #     >>> angles = (4.0*math.pi) * (numpy.random.random(3) - 0.5)
+    #     >>> for axes in _AXES2TUPLE.keys():
+    #     ...    R0 = euler_matrix(axes=axes, *angles)
+    #     ...    R1 = euler_matrix(axes=axes, *euler_from_matrix(R0, axes))
+    #     ...    if not numpy.allclose(R0, R1): print axes, "failed"
 
-        """
-        return transforms3d.euler.mat2euler(matrix, axes=axes)
+    #     """
+    #     return transforms3d.euler.mat2euler(matrix, axes=axes)
 
 
-    def euler_from_quaternion(self, quaternion, axes='sxyz'):
-        """
-        Return Euler angles from quaternion for specified axis sequence.
+    # def euler_from_quaternion(self, quaternion, axes='sxyz'):
+    #     """
+    #     Return Euler angles from quaternion for specified axis sequence.
 
-        >>> angles = euler_from_quaternion([0.06146124, 0, 0, 0.99810947])
-        >>> numpy.allclose(angles, [0.123, 0, 0])
-        True
+    #     >>> angles = euler_from_quaternion([0.06146124, 0, 0, 0.99810947])
+    #     >>> numpy.allclose(angles, [0.123, 0, 0])
+    #     True
 
-        """
-        return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
+    #     """
+    #     return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
     
 
     def adjust_yaw(self, yaw):
@@ -482,7 +487,8 @@ class OffboardControl(Node):
         self.vy = msg.velocity[1]
         self.vz = msg.velocity[2]
 
-        self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
+        # self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
+        self.roll, self.pitch, yaw = quat2euler(msg.q)
         self.yaw = self.adjust_yaw(yaw)
 
         self.p = msg.angular_velocity[0]
@@ -601,19 +607,21 @@ class OffboardControl(Node):
         last_input_using_force = np.vstack([old_force, self.u0[1:]])
 
 #~~~~~~~~~~~~~~~ Calculate reference trajectory ~~~~~~~~~~~~~~~
-        # if self.time_from_start <= 10.0:
-        #     reffunc = self.hover_ref_func(1)
-        # else:
-        #     reffunc = self.circle_horz_ref_func()
-        #     reffunc = self.circle_horz_spin_ref_func()
-        #     reffunc = self.circle_vert_ref_func()
-        #     reffunc = self.fig8_horz_ref_func()
-        #     reffunc = self.fig8_vert_ref_func_short()
-        #     reffunc = self.fig8_vert_ref_func_tall()
-        #     reffunc = self.helix()
-        #     reffunc = self.helix_spin()
-
-        # reffunc = self.yawing_only()
+        if self.time_from_start <= self.cushion_time:
+            reffunc = self.hover_ref_func(1)
+        elif self.cushion_time < self.time_from_start < self.cushion_time + self.flight_time:
+            # reffunc = self.circle_horz_ref_func()
+            # reffunc = self.circle_horz_spin_ref_func()
+            reffunc = self.circle_vert_ref_func()
+            # reffunc = self.fig8_horz_ref_func()
+            # reffunc = self.fig8_vert_ref_func_short()
+            # reffunc = self.fig8_vert_ref_func_tall()
+            # reffunc = self.helix()
+            # reffunc = self.helix_spin()
+        elif self.cushion_time + self.flight_time <= self.time_from_start <= self.time_before_land:
+            reffunc = self.hover_ref_func(1)
+        else:
+            reffunc = self.hover_ref_func(1)
         # reffunc = self.hover_ref_func(1)
         # reffunc = self.circle_horz_ref_func()
         # reffunc = self.circle_horz_spin_ref_func()
@@ -622,7 +630,9 @@ class OffboardControl(Node):
         # reffunc = self.fig8_vert_ref_func_short()
         # reffunc = self.fig8_vert_ref_func_tall()
         # reffunc = self.helix()
-        reffunc = self.helix_spin()
+        # reffunc = self.helix_spin()
+        # reffunc = self.yawing_only()
+
         print(f"reffunc: {reffunc}")
 
         # Calculate the Newton-Rapshon control input and transform the force into a throttle command for publishing to the vehicle
@@ -1514,8 +1524,8 @@ class OffboardControl(Node):
         w = 2*m.pi / PERIOD
 
         SPIN_PERIOD = 10
-        # yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
-        yaw_ref = t / (SPIN_PERIOD/(2*np.pi))
+        yaw_ref = (t - self.cushion_time) / (SPIN_PERIOD / (2*m.pi))
+
         r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -0.8, yaw_ref ]]).T
 
         return r
@@ -1591,8 +1601,8 @@ class OffboardControl(Node):
         height_variance = 0.3
 
         SPIN_PERIOD = 15
-        # yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
-        yaw_ref = t / (SPIN_PERIOD/(2*np.pi))
+        yaw_ref = (t - self.cushion_time) / (SPIN_PERIOD / (2*m.pi))
+
         r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -1*(z0 + height_variance * m.sin(w_z * t)), yaw_ref]]).T
         return r
     
@@ -1601,106 +1611,13 @@ class OffboardControl(Node):
         print(f"yawing_only")
 
         t = self.time_from_start + self.T_LOOKAHEAD
-        SPIN_PERIOD = 7
-        # yaw_ref = self.normalize_angle( t / (SPIN_PERIOD/(2*np.pi)) )
-        yaw_ref = t / (SPIN_PERIOD/(2*np.pi))
+        SPIN_PERIOD = 15
+        
+        yaw_ref = (t - self.cushion_time) / (SPIN_PERIOD / (2*m.pi))
         r = np.array([[0., 0., -0.5, yaw_ref]]).T
         return r
     
-    def helix_old(self, num): #Returns Spiral Staircase Reference Trajectories ([x,y,z,yaw])
-        """ Returns spiral staircase reference trajectories. """
-        if self.pred_type == 1 or self.pred_type == 2:
-            print("changing yaw not available for linearized predictor or neural network predictors")
-            exit(1)
-        if not self.sim:
-            print("spiral trajectories not YET available for hardware")
-            if num > 3:
-                print("spiral modes above 3 not available for hardware")
-                exit(1)
-            exit(1)
 
-        t = self.time_from_start + self.T_LOOKAHEAD
-        
-        # For x and y elements of spiral staircase
-        amplitude_xy = 0.8
-        desired_xy_period = 4 #6+ for hardware
-        w_xy = (2*m.pi) / desired_xy_period
-
-        # For height element of spiral staircase 
-        amplitude_h = 0.8
-        buffer = 0.4
-        desired_rise_period = desired_xy_period * 2.5 #3+ for hardware with 6+ for xy period
-        w_rise = (2*m.pi) / desired_rise_period
-
-        # For Yawing while spiraling
-        desired_yaw_period = desired_xy_period * 2
-        w_yaw = (2*m.pi) / desired_yaw_period
-
-        circle_period_hardware = 11 # maybe 8?
-        w_xy_hardware = 2*m.pi / circle_period_hardware
-
-        vert_period_hardware = circle_period_hardware * 3
-        w_vert_hardware = 2*m.pi / vert_period_hardware
-
-        yaw_multiplier_hardware = 1.5 #maybe 2, or 1.5 if you get brave
-        w_yaw_hardware = 2*m.pi / (circle_period_hardware*3*yaw_multiplier_hardware)
-
-        spiral_dict = { #4+ are for sim only in case any of this makes it onto hardware
-            1: np.array([[0.0, 0.0, -1*( -.8*m.sin((2*m.pi/(6*3))*t) + (0.8+0.4) ), 0.0]]).T,
-            2: np.array([[0.8*m.cos(w_xy_hardware*t), 0.8*m.sin(w_xy_hardware*t), -1*( 0.8*m.sin(w_vert_hardware*t) + (0.8+0.4) ), 0.0]]).T,
-            3: np.array([[0.8*m.cos(w_xy_hardware*t), 0.8*m.sin(w_xy_hardware*t), -1*( 0.8*m.sin(w_vert_hardware*t) + (0.8+0.4) ), w_yaw_hardware*t]]).T,
-            4: np.array([[0.8*m.cos((2*m.pi/4)*t), 0.8*m.sin((2*m.pi/4)*t), -1*( 0.8*m.sin((2*m.pi/(4*2.5))*t) + (0.8+0.4) ), 0.0]]).T,
-            5: np.array([[0.8*m.cos((2*m.pi/4)*t), 0.8*m.sin((2*m.pi/4)*t), -1*( 0.8*m.sin((2*m.pi/(4*2.5))*t) + (0.8+0.4) ), (2*m.pi/ (4*2.5*2.5))*t]]).T,
-            6: np.array([[amplitude_xy*m.cos(w_xy*t), amplitude_xy*m.sin(w_xy*t), -1*( amplitude_h*m.sin(w_rise*t) + (amplitude_h+buffer) ), w_yaw*t]]).T,
-        }
-        if num > len(spiral_dict) or num < 1:
-            print(f"spiral_dict #{num} not found")
-            exit(0)
-    
-        print(f"spiral_dict #{num}")
-        return spiral_dict.get(num)
-
-    def yaw_ref_old(self, num): #Returns Yawing Reference Trajectories ([x,y,z,yaw])
-        """ Returns yawing reference trajectories. """
-        if self.pred_type == 1 or self.pred_type == 2:
-            print("changing yaw not available for linearized predictor or neural network predictors")
-            exit(1)
-        if not self.sim:
-            print("changing yaw not YET available for hardware")
-            if num > 3:
-                print("yaw modes above 3 not available for hardware")
-                exit(1)
-            exit(1)
-
-        t = self.time_from_start + self.T_LOOKAHEAD
-
-        # For Yawing
-        desired_yaw_period = 6
-        w_yaw = (2*m.pi) / desired_yaw_period
-
-        # For circles while yawing
-        amplitude_xy = 0.8
-        desired_xy_period = 6 #6+ for hardware
-        w_xy = (2*m.pi) / desired_xy_period
-
-        hardware_period = 11
-        w_xy_hardware = 2*m.pi / hardware_period
-        yaw_hardware_multiplier = 1.5
-        w_yaw_hardware = 2*m.pi / (hardware_period*3*yaw_hardware_multiplier)
-        yaw_dict = {
-            1: np.array([[0.0, 0.0, -0.6, w_yaw_hardware*t]]).T,
-            2: np.array([[0.8, 0.8, -0.8, w_yaw_hardware*t]]).T,
-            3: np.array([[0.8*m.cos(w_xy_hardware*t), 0.8*m.sin(w_xy_hardware*t), -0.8, w_yaw_hardware*t]]).T,
-            4: np.array([[amplitude_xy*m.cos(w_xy*t), amplitude_xy*m.sin(w_xy*t), -0.8, w_yaw*t]]).T,
-        }
-        if num > len(yaw_dict) or num < 1:
-            print(f"yaw_dict #{num} not found")
-            exit(1)
-    
-        print(f"yaw_dict #{num}")
-        return yaw_dict.get(num)
-
-    
 
 # ~~ Entry point of the code -> Initializes the node and spins it. Also handles exceptions and logging ~~
 def main(args=None):

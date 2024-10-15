@@ -21,7 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'nr_quad = quad_newton_raphson.nr_quad:main',
-            'test = quad_newton_raphson.test_ENU:main',
+            # 'test = quad_newton_raphson.test_ENU:main',
+            # 'old_nr = quad_newton_raphson.old_nr_final:main',
         ],
     },
 )

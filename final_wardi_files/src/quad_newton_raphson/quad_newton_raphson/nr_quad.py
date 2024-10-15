@@ -1,4 +1,6 @@
+print(f"conversion")
 wardiNN_on = bool(int(input("Is the wardiNN conda env activated? Press 0 for No and 1 for Yes: ")))
+
 if wardiNN_on:
     print("You're all set :)")
 else:
@@ -29,7 +31,6 @@ import scipy.linalg as sp_linalg
 import jax.numpy as jnp
 from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
 from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
-print(f"new quat conversion")
 from transforms3d.euler import quat2euler
 
 import time
@@ -41,6 +42,7 @@ from pyJoules.device.rapl_device import RaplPackageDomain, RaplCoreDomain
 from pyJoules.energy_meter import EnergyContext
 
 import sys
+import os
 import traceback
 from .Logger import Logger
 
@@ -179,7 +181,9 @@ class OffboardControl(Node):
             if self.nonlin0:
                 print("Using CPP 0-Order Hold Predictor")
                 # Load the C shared library
-                self.my_library = ctypes.CDLL('/home/factslabegmc/NRJournal/src/newton_raphson/newton_raphson/nonlin_0order.so')  # Update the library filename
+                base_path = os.path.dirname(os.path.abspath(__file__))        # Get the directory where the script is located
+                nonlin_path = os.path.join(base_path, 'nonlin_0order.so')
+                self.my_library = ctypes.CDLL(nonlin_path)  # Update the library filename
                 # Set argument and return types for the function
                 self.my_library.performCalculations.argtypes = [
                     ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double,

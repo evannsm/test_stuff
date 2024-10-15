@@ -51,7 +51,7 @@ if np.__version__ != '1.23.4':
 else:
     print(f"Using numpy version 1.23.4!")
 
-if np.__version__ < 1.24:
+if int(np.__version__) < 1.24:
     print(f"can't use jax. requires numpy version >= 1.24")
 else:
     import jax.numpy as jnp
@@ -268,12 +268,19 @@ class OffboardControl(Node):
                     return logits
                 
             self.NN = FeedForward()
+            base_path = os.path.dirname(os.path.abspath(__file__))        # Get the directory where the script is located
+            ff_path_hardware = os.path.join(base_path, 'holybro_ff.pt')
+            ff_path_sim = os.path.join(base_path, 'sim_ff.pt')
             if self.sim:
-                self.NN.load_state_dict(torch.load('/home/factslabegmc/final_wardi_files/src/quad_newton_raphson/quad_newton_raphson/sim_ff.pt'))
+                self.NN.load_state_dict(torch.load(ff_path_sim))
             else:
-                self.NN.load_state_dict(torch.load('/home/factslabegmc/final_wardi_files/src/quad_newton_raphson/quad_newton_raphson/holybro_ff.pt'))
+                self.NN.load_state_dict(torch.load(ff_path_hardware))
 
-        if np.__version__ >= 1.24:
+        if np.__version__ != 1.24:
+            if self.pred_type == 3: #Jax Predictor
+                print("Can't use Jax. Requires numpy version >= 1.24")
+                exit(1)
+        elif np.__version__ == 1.24:
             if self.pred_type == 3: #Jax Predictor
                 print("Using Jax")
                 if self.nonlin0:
@@ -282,8 +289,7 @@ class OffboardControl(Node):
                     print("Using Jax 1stOrder Hold Predictor")
                     self.udot = np.array([[0, 0, 0, 0]], dtype=np.float64).T
         else:
-            print("Can't use Jax. Requires numpy version >= 1.24")
-            exit(1)
+            print("Can't use Jax. requires numpy version >= 1.24")
 
         self.metadata = np.array(['Sim' if self.sim else 'Hardware',
                                   'Jax' if self.pred_type == 3 else 'NN' if self.pred_type == 2 else 'Linear' if self.pred_type == 1 else 'Nonlinear',

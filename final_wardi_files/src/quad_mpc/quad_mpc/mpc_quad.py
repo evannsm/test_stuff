@@ -1,12 +1,27 @@
-# TODO: 1) change time.time() to time.process_time
+import os
+def is_conda_env_activated():
+    """Checks if a conda environment is activated."""
+    return 'CONDA_DEFAULT_ENV' in os.environ
 
+def get_conda_env():
+    """Gets the currently activated conda environment name."""
+    return os.environ.get('CONDA_DEFAULT_ENV', None)
 
-wardiNN_on = bool(int(input("Is the wardiNN conda env activated? Press 0 for No and 1 for Yes: ")))
-if wardiNN_on:
-    print("You're all set :)")
+if not is_conda_env_activated():
+    # print("Please set up and activate the conda environment.")
+    # exit(1)
+    raise EnvironmentError("Please set up and activate the conda environment.")
+
+elif get_conda_env() != 'wardiNN':
+    # print("Conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
+    # exit(1)
+    raise EnvironmentError("I can see conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
+
 else:
-    print("Sorry you need to set up the conda environment and have it activated")
-    exit(1)
+    print("I can see that conda environment 'wardiNN' is activated!!!!")
+    print("Ok you're all set :)")
+
+
 
 import rclpy
 from rclpy.node import Node
@@ -17,9 +32,8 @@ from std_msgs.msg import Float64MultiArray
 from .workingModel import Quadrotor
 from .workingGenMPC import QuadrotorMPC2
 
-print(f"new quat conversion")
 from transforms3d.euler import quat2euler
-import transforms3d
+# import transforms3d
 
 import numpy as np
 import math as m
@@ -494,8 +508,8 @@ class OffboardControl(Node):
         if self.time_from_start <= self.cushion_time:
             reffunc = self.hover_ref_func(1)
         elif self.cushion_time < self.time_from_start < self.cushion_time + self.flight_time:
-            # reffunc = self.circle_horz_ref_func()
-            reffunc = self.circle_horz_spin_ref_func()
+            reffunc = self.circle_horz_ref_func()
+            # reffunc = self.circle_horz_spin_ref_func()
             # reffunc = self.circle_vert_ref_func()
             # reffunc = self.fig8_horz_ref_func()
             # reffunc = self.fig8_vert_ref_func_short()
@@ -507,7 +521,7 @@ class OffboardControl(Node):
         else:
             reffunc = self.hover_ref_func(1)
 
-        # reffunc = self.hover_ref_func(1)
+        reffunc = self.hover_ref_func(1)
         # reffunc = self.circle_horz_ref_func()
         # reffunc = self.circle_horz_spin_ref_func()
         # reffunc = self.circle_vert_ref_func()

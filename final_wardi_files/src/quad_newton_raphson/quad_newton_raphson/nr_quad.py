@@ -1,11 +1,25 @@
-print(f"conversion")
-wardiNN_on = bool(int(input("Is the wardiNN conda env activated? Press 0 for No and 1 for Yes: ")))
+import os
+def is_conda_env_activated():
+    """Checks if a conda environment is activated."""
+    return 'CONDA_DEFAULT_ENV' in os.environ
 
-if wardiNN_on:
-    print("You're all set :)")
+def get_conda_env():
+    """Gets the currently activated conda environment name."""
+    return os.environ.get('CONDA_DEFAULT_ENV', None)
+
+if not is_conda_env_activated():
+    # print("Please set up and activate the conda environment.")
+    # exit(1)
+    raise EnvironmentError("Please set up and activate the conda environment.")
+
+elif get_conda_env() != 'wardiNN':
+    # print("Conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
+    # exit(1)
+    raise EnvironmentError("I can see conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
+
 else:
-    print("Sorry you need to set up the conda environment and have it activated")
-    exit(1)
+    print("I can see that conda environment 'wardiNN' is activated!!!!")
+    print("Ok you're all set :)")
 
 import torch
 from torch import nn
@@ -18,8 +32,9 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from px4_msgs.msg import OffboardControlMode, VehicleRatesSetpoint, VehicleCommand, VehicleStatus, VehicleOdometry, TrajectorySetpoint, RcChannels
 from std_msgs.msg import Float64MultiArray
 
-from tf_transformations import euler_from_quaternion
-import transforms3d
+# from tf_transformations import euler_from_quaternion
+# import transforms3d
+from transforms3d.euler import quat2euler
 
 import sympy as smp
 import numpy as np
@@ -31,7 +46,6 @@ import scipy.linalg as sp_linalg
 import jax.numpy as jnp
 from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
 from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
-from transforms3d.euler import quat2euler
 
 import time
 import ctypes
@@ -42,7 +56,6 @@ from pyJoules.device.rapl_device import RaplPackageDomain, RaplCoreDomain
 from pyJoules.energy_meter import EnergyContext
 
 import sys
-import os
 import traceback
 from .Logger import Logger
 
@@ -190,14 +203,17 @@ class OffboardControl(Node):
                     ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double,
                     ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int
                     ] 
+                print(f"NONLIN LIB PATH: {nonlin_path}")
+                # exit(0)
             else:
                 print("Using CPP 1st-Order Hold Predictor")
                 self.udot = np.array([[0, 0, 0, 0]], dtype=np.float64).T
                 print(f"udot: {self.udot}")
                 print(f"udot shape: {self.udot.shape}")
-                # self.linearized_model()
                 # Load the C shared library
-                self.my_library = ctypes.CDLL('/home/factslabegmc/NRJournal/src/newton_raphson/newton_raphson/nonlin_1storder.so')  # Update the library filename
+                base_path = os.path.dirname(os.path.abspath(__file__))        # Get the directory where the script is located
+                nonlin_path = os.path.join(base_path, 'nonlin_1storder.so')
+                self.my_library = ctypes.CDLL(nonlin_path)  # Update the library filename
                 # Set argument and return types for the function
                 self.my_library.performCalculations.argtypes = [
                     ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double,
@@ -205,7 +221,8 @@ class OffboardControl(Node):
                     ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int,
                     ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double
                 ]
-
+                print(f"NONLIN LIB PATH: {nonlin_path}")
+                # exit(0)
             self.my_library.performCalculations.restype = ctypes.POINTER(Vector9x1)
 
         if self.pred_type == 1: #Linear Predictor
@@ -614,9 +631,9 @@ class OffboardControl(Node):
         if self.time_from_start <= self.cushion_time:
             reffunc = self.hover_ref_func(1)
         elif self.cushion_time < self.time_from_start < self.cushion_time + self.flight_time:
-            # reffunc = self.circle_horz_ref_func()
+            reffunc = self.circle_horz_ref_func()
             # reffunc = self.circle_horz_spin_ref_func()
-            reffunc = self.circle_vert_ref_func()
+            # reffunc = self.circle_vert_ref_func()
             # reffunc = self.fig8_horz_ref_func()
             # reffunc = self.fig8_vert_ref_func_short()
             # reffunc = self.fig8_vert_ref_func_tall()
@@ -626,7 +643,9 @@ class OffboardControl(Node):
             reffunc = self.hover_ref_func(1)
         else:
             reffunc = self.hover_ref_func(1)
-        # reffunc = self.hover_ref_func(1)
+
+
+        reffunc = self.hover_ref_func(1)
         # reffunc = self.circle_horz_ref_func()
         # reffunc = self.circle_horz_spin_ref_func()
         # reffunc = self.circle_vert_ref_func()
@@ -767,7 +786,7 @@ class OffboardControl(Node):
         return delta_yaw
     
     def get_tracking_error(self, reffunc, pred):
-        print(f"reffunc: {reffunc}")
+        # print(f"reffunc: {reffunc}")
         print(f"pred: {pred}")
         err = reffunc - pred
         # # current_yaw = pred[3][0] # current yaw angle

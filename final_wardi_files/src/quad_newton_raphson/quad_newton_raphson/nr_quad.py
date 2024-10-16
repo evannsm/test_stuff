@@ -51,7 +51,7 @@ if np.__version__ != '1.23.4':
 else:
     print(f"Using numpy version 1.23.4!")
 
-if int(np.__version__) < 1.24:
+if np.__version__ != 1.24:
     print(f"can't use jax. requires numpy version >= 1.24")
 else:
     import jax.numpy as jnp

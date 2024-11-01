@@ -1,25 +1,25 @@
 import os
-def is_conda_env_activated():
-    """Checks if a conda environment is activated."""
-    return 'CONDA_DEFAULT_ENV' in os.environ
+# def is_conda_env_activated():
+#     """Checks if a conda environment is activated."""
+#     return 'CONDA_DEFAULT_ENV' in os.environ
 
-def get_conda_env():
-    """Gets the currently activated conda environment name."""
-    return os.environ.get('CONDA_DEFAULT_ENV', None)
+# def get_conda_env():
+#     """Gets the currently activated conda environment name."""
+#     return os.environ.get('CONDA_DEFAULT_ENV', None)
 
-if not is_conda_env_activated():
-    # print("Please set up and activate the conda environment.")
-    # exit(1)
-    raise EnvironmentError("Please set up and activate the conda environment.")
+# if not is_conda_env_activated():
+#     # print("Please set up and activate the conda environment.")
+#     # exit(1)
+#     raise EnvironmentError("Please set up and activate the conda environment.")
 
-elif get_conda_env() != 'wardiNN':
-    # print("Conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
-    # exit(1)
-    raise EnvironmentError("I can see conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
+# elif get_conda_env() != 'wardiNN':
+#     # print("Conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
+#     # exit(1)
+#     raise EnvironmentError("I can see conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
 
-else:
-    print("I can see that conda environment 'wardiNN' is activated!!!!")
-    print("Ok you're all set :)")
+# else:
+#     print("I can see that conda environment 'wardiNN' is activated!!!!")
+#     print("Ok you're all set :)")
 
 import torch
 from torch import nn
@@ -58,6 +58,10 @@ else:
     from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
     from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
 
+import jax.numpy as jnp
+from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
+from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
+
 import time
 import ctypes
 
@@ -69,6 +73,7 @@ import sys
 import traceback
 from .Logger import Logger
 
+from . jitted_nn_jac import *
 
 class OffboardControl(Node):
     """Node for controlling a vehicle in offboard mode."""
@@ -97,7 +102,7 @@ class OffboardControl(Node):
         self.mode_channel = 5
         self.pyjoules_on = int(input("Use PyJoules? 1 for Yes 0 for No: ")) #False
         if self.pyjoules_on:
-            self.csv_handler = CSVHandler('nr_nonlin_cpu_energy.csv')
+            self.csv_handler = CSVHandler('nr_aggressive.log')
 ###############################################################################################################################################
 
         # Configure QoS profile for publishing and subscribing
@@ -143,8 +148,8 @@ class OffboardControl(Node):
 ###############################################################################################################################################
 
         # Initialize variables:
-        self.cushion_time = 5.0
-        self.flight_time = 30.0
+        self.cushion_time = 8.0
+        self.flight_time = 20.0
         self.time_before_land = self.flight_time + 2*(self.cushion_time)
         print(f"time_before_land: {self.time_before_land}")
         self.offboard_setpoint_counter = 0 #helps us count 10 cycles of sending offboard heartbeat before switching to offboard mode and arming
@@ -255,7 +260,20 @@ class OffboardControl(Node):
             """
             # exit(0)   
 
-        if self.pred_type == 2: #Neural Network Predictor
+        if self.pred_type == 2: #Jax Neural Network Predictor
+            print("Using Jax Feedforward NN")
+            self.nonlin0 = False
+            x = np.random.randn(9)
+            u = np.random.randn(4)
+            self.apply_model = apply_model
+            self.compute_inv_jac = compute_inv_jac
+            self.apply_model(x,u)
+            self.compute_inv_jac(x,u)
+            # compute_jacobian(x,u)
+            print("succeeded")
+            # exit(0)
+
+        if self.pred_type == 5: #Neural Network Predictor
             print("Using Feedforward NN")
             # Load NN predictor:
             class FeedForward(nn.Module):
@@ -278,20 +296,20 @@ class OffboardControl(Node):
             else:
                 self.NN.load_state_dict(torch.load(ff_path_hardware))
 
-        if np.__version__ != 1.24:
-            if self.pred_type == 3: #Jax Predictor
-                print("Can't use Jax. Requires numpy version >= 1.24")
-                exit(1)
-        elif np.__version__ == 1.24:
-            if self.pred_type == 3: #Jax Predictor
-                print("Using Jax")
-                if self.nonlin0:
-                    print("Using Jax 0 Order Hold Predictor")
-                else:
-                    print("Using Jax 1stOrder Hold Predictor")
-                    self.udot = np.array([[0, 0, 0, 0]], dtype=np.float64).T
-        else:
-            print("Can't use Jax. requires numpy version >= 1.24")
+        # if np.__version__ != 1.24:
+        #     if self.pred_type == 3: #Jax Predictor
+        #         print("Can't use Jax. Requires numpy version >= 1.24")
+        #         exit(1)
+        # elif np.__version__ == 1.24:
+        #     if self.pred_type == 3: #Jax Predictor
+        #         print("Using Jax")
+        #         if self.nonlin0:
+        #             print("Using Jax 0 Order Hold Predictor")
+        #         else:
+        #             print("Using Jax 1stOrder Hold Predictor")
+        #             self.udot = np.array([[0, 0, 0, 0]], dtype=np.float64).T
+        # else:
+        #     print("Can't use Jax. requires numpy version >= 1.24")
 
         self.metadata = np.array(['Sim' if self.sim else 'Hardware',
                                   'Jax' if self.pred_type == 3 else 'NN' if self.pred_type == 2 else 'Linear' if self.pred_type == 1 else 'Nonlinear',
@@ -690,13 +708,15 @@ class OffboardControl(Node):
 
         # Calculate the Newton-Rapshon control input and transform the force into a throttle command for publishing to the vehicle
         new_u = self.get_new_NR_input(last_input_using_force, reffunc)
+        # print(f"new_u: {new_u}")
         new_force = new_u[0][0]        
         print(f"new_force: {new_force}")
 
         new_throttle = self.get_throttle_command_from_force(new_force)
-        new_roll_rate = new_u[1][0]
-        new_pitch_rate = new_u[2][0]
-        new_yaw_rate = new_u[3][0]
+        new_throttle = float(new_throttle)  # Already a float, but for clarity
+        new_roll_rate = float(new_u[1][0])  # Convert jax.numpy array to float
+        new_pitch_rate = float(new_u[2][0])  # Convert jax.numpy array to float
+        new_yaw_rate = float(new_u[3][0])    # Convert jax.numpy array to float
 
 
         # Build the final input vector to save as self.u0 and publish to the vehicle via publish_rates_setpoint:
@@ -704,10 +724,13 @@ class OffboardControl(Node):
         current_input_save = np.array(final).reshape(-1, 1) # reshaped to column vector for saving as class variable
         self.u0 = current_input_save # saved as class variable for next iteration of NR control
         # print(f"newInput: \n{current_input_save}")
+        # print(f"final: {final}")
 
+        final = 4*[float(0.0)]
+        print(f"{final = }")
         self.publish_rates_setpoint(final[0], final[1], final[2], final[3])
         
-        
+        # exit(1)
         # Log the states, inputs, and reference trajectories for data analysis
         controller_callback_time = time.time() - t0
         state_input_ref_log_info = [float(self.x), float(self.y), float(self.z), float(self.yaw), float(final[0]), float(final[1]), float(final[2]), float(final[3]), float(reffunc[0][0]), float(reffunc[1][0]), float(reffunc[2][0]), float(reffunc[3][0]), self.time_from_start, controller_callback_time]
@@ -802,8 +825,8 @@ class OffboardControl(Node):
 
     def shortest_path_yaw_quaternion(self, current_yaw, desired_yaw):
         """ Calculate the shortest path between two yaw angles using quaternions. """
-        q_current = self.quaternion_from_yaw(current_yaw) #unit quaternion from current yaw angle
-        q_desired = self.quaternion_from_yaw(desired_yaw) #unit quaternion from desired yaw angle
+        q_current = self.quaternion_normalize(self.quaternion_from_yaw(current_yaw)) #unit quaternion from current yaw angle
+        q_desired = self.quaternion_normalize(self.quaternion_from_yaw(desired_yaw)) #unit quaternion from desired yaw angle
         
         q_error = self.quaternion_multiply(q_desired, self.quaternion_conjugate(q_current)) #error quaternion
         q_error_normalized = self.quaternion_normalize(q_error) #normalize error quaternion
@@ -1005,8 +1028,32 @@ class OffboardControl(Node):
             # print(f"{type(adjusted_invjac) = }")
             self.jac_inv = adjusted_invjac
             return outputs
-
+        
     def get_nn_predict(self, last_input): #Predicts System Output State Using Neural Network
+        position_now = np.array(self.state_vector.T.tolist()[0])
+        # position_now[-1] = self.adjust_yaw(position_now[-1])
+        curr_thrust = -last_input[0][0]
+        curr_rolldot = last_input[1][0]
+        curr_pitchdot = last_input[2][0]
+        curr_yawdot = last_input[3][0]
+        
+        input_data = np.array([curr_thrust, curr_rolldot, curr_pitchdot, curr_yawdot])
+        outputNN = self.apply_model(position_now, input_data)
+        inv_jac, cond, cond2 = self.compute_inv_jac(position_now, input_data)
+
+        outputs = np.array(outputNN).reshape(-1, 1)
+        print(f"\n")
+        print(f"{cond = }")
+        print(f"{cond2 = }")
+        print(f"\n")
+
+        self.jac_inv = inv_jac
+        return outputs
+
+
+
+
+    def get_nn_predict2(self, last_input): #Predicts System Output State Using Neural Network
         """ Predicts the system output state using a feedforward neural network. """
         position_now = self.state_vector.T.tolist()[0]
         curr_thrust = -last_input[0][0]
@@ -1674,14 +1721,14 @@ class OffboardControl(Node):
         t = t_traj + self.T_LOOKAHEAD
 
         PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
+        PERIOD_Z = 13
 
         if self.double_speed:
             PERIOD /= 2.0
-
+            PERIOD_Z /= 2.0
         w = 2*m.pi / PERIOD
-
-        PERIOD_Z = 13
         w_z = 2*m.pi / PERIOD_Z
+
         z0 = 0.8
         height_variance = 0.3
         r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -1*(z0 + height_variance * m.sin(w_z * t)), 0.0]]).T

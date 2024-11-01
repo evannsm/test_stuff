@@ -1,0 +1,12 @@
+running develop
+running egg_info
+creating quad_mpc.egg-info
+writing manifest file 'quad_mpc.egg-info/SOURCES.txt'
+writing manifest file 'quad_mpc.egg-info/SOURCES.txt'
+running build_ext
+running install_data
+creating /home/factslabegmc/final_wardi_files/install/quad_mpc/share/ament_index
+creating /home/factslabegmc/final_wardi_files/install/quad_mpc/share/ament_index/resource_index
+creating /home/factslabegmc/final_wardi_files/install/quad_mpc/share/ament_index/resource_index/packages
+copying resource/quad_mpc -> /home/factslabegmc/final_wardi_files/install/quad_mpc/share/ament_index/resource_index/packages
+copying package.xml -> /home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc

@@ -16,7 +16,7 @@ def dynamics_1order(state, input, input_derivs, g, m):
     cy = jnp.cos(yaw)
 
     # Update derivatives
-    vxdot = -(thrust / m) * (sr * sy + cr * cy * sp)
+    vxdot = -(thrust / m) * (sr * sy + cr * cy * sp) #rpy  = phi, theta, psi
     vydot = -(thrust / m) * (cr * sy * sp - cy * sr)
     vzdot = g - (thrust / m) * (cr * cp)
 

@@ -1,42 +1,27 @@
-# def is_conda_env_activated():
-#     """Checks if a conda environment is activated."""
-#     return 'CONDA_DEFAULT_ENV' in os.environ
-
-# def get_conda_env():
-#     """Gets the currently activated conda environment name."""
-#     return os.environ.get('CONDA_DEFAULT_ENV', None)
-
-# if not is_conda_env_activated():
-#     # print("Please set up and activate the conda environment.")
-#     # exit(1)
-#     raise EnvironmentError("Please set up and activate the conda environment.")
-
-# elif get_conda_env() != 'wardiNN':
-#     # print("Conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
-#     # exit(1)
-#     raise EnvironmentError("I can see conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
-
-# else:
-#     print("I can see that conda environment 'wardiNN' is activated!!!!")
-#     print("Ok you're all set :)")
-
-# if np.__version__ != '1.23.4':
-#     # print("Please use numpy version 1.23.4")
-#     # exit(1)
-#     print(f"{np.__version__ = }")
-#     raise EnvironmentError("Please use numpy version 1.23.4")
-# else:
-#     print(f"Using numpy version 1.23.4!")
-
-# if np.__version__ != 1.24:
-#     print(f"can't use jax. requires numpy version >= 1.24")
-# else:
-#     import jax.numpy as jnp
-#     from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
-#     from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
-
-
 import os
+def is_conda_env_activated():
+   """Checks if a conda environment is activated."""
+   return 'CONDA_DEFAULT_ENV' in os.environ
+
+def get_conda_env():
+   """Gets the currently activated conda environment name."""
+   return os.environ.get('CONDA_DEFAULT_ENV', None)
+
+if not is_conda_env_activated():
+   # print("Please set up and activate the conda environment.")
+   # exit(1)
+   raise EnvironmentError("Please set up and activate the conda environment.")
+
+elif get_conda_env() != 'wardiNN':
+   # print("Conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
+   # exit(1)
+   raise EnvironmentError("I can see conda is activated but not the 'wardiNN' environment. Please activate the 'wardiNN' conda environment.")
+
+else:
+   print("I can see that conda environment 'wardiNN' is activated!!!!")
+   print("Ok you're all set :)")
+   import sys
+   sys.path.append('/home/factslabegmc/miniconda3/envs/wardiNN')
 
 import rclpy
 from rclpy.node import Node
@@ -44,30 +29,34 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from px4_msgs.msg import OffboardControlMode, VehicleRatesSetpoint, VehicleCommand, VehicleStatus, VehicleOdometry, TrajectorySetpoint, RcChannels
 from std_msgs.msg import Float64MultiArray
 
-
-from transforms3d.euler import quat2euler
-
-import math as m
-import numpy as np
 import sympy as smp
-# import scipy.integrate as sp_int
-# import scipy.linalg as sp_linalg
+import math as m
 
+import scipy.integrate as sp_int
+import scipy.linalg as sp_linalg
+
+import numpy as np
 import jax.numpy as jnp
 from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
 from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
 from . jitted_nn_jac import *
+
+import torch
+from torch import nn
+import torch.nn.functional as F
+from torch.autograd import Function
+
+import time
+import ctypes
+from transforms3d.euler import quat2euler
 
 from pyJoules.handler.csv_handler import CSVHandler
 from pyJoules.device.rapl_device import RaplPackageDomain, RaplCoreDomain
 from pyJoules.energy_meter import EnergyContext
 
 import sys
-import time
-import ctypes
 import traceback
 from .Logger import Logger
-
 
 class OffboardControl(Node):
     """Node for controlling a vehicle in offboard mode."""
@@ -505,7 +494,7 @@ class OffboardControl(Node):
     #     """
     #     return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
     
-    def xeuler_from_quaternion(w, x, y, z):
+    def xeuler_from_quaternion(self, w, x, y, z):
             """
             Convert a quaternion into euler angles (roll, pitch, yaw)
             roll is rotation around x in radians (counterclockwise)
@@ -563,12 +552,10 @@ class OffboardControl(Node):
         self.vy = msg.velocity[1]
         self.vz = msg.velocity[2]
 
+        # print(f"{msg.q = }")
         # self.roll, self.pitch, yaw = quat2euler(msg.q)
         self.roll, self.pitch, yaw = self.xeuler_from_quaternion(*msg.q)
-        print(f"{msg.q = }")
-        print(f"{type(msg.q) = }")
-        exit(0)
-        self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
+        # self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
         self.yaw = self.adjust_yaw(yaw)
 
         self.p = msg.angular_velocity[0]
@@ -745,7 +732,7 @@ class OffboardControl(Node):
         # print(f"newInput: \n{current_input_save}")
         # print(f"final: {final}")
 
-        final = 4*[float(0.0)]
+        # final = 4*[float(0.0)]
         print(f"{final = }")
         self.publish_rates_setpoint(final[0], final[1], final[2], final[3])
         

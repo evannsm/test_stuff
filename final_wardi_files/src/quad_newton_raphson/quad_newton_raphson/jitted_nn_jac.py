@@ -60,7 +60,7 @@ def compute_jacobian(state, ctrl):
 def compute_inv_jac(state,ctrl):
     jac = compute_jacobian(state,ctrl)
     cond = jnp.linalg.cond(jac)
-    jac += 1e-3 * jnp.eye(jac.shape[0])
+    # jac += 1e-3 * jnp.eye(jac.shape[0])
     cond2 = jnp.linalg.cond(jac)
 
     inv_jacobian = jnp.linalg.pinv(jac)

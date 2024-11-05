@@ -1,4 +1,3 @@
-import os
 # def is_conda_env_activated():
 #     """Checks if a conda environment is activated."""
 #     return 'CONDA_DEFAULT_ENV' in os.environ
@@ -21,10 +20,23 @@ import os
 #     print("I can see that conda environment 'wardiNN' is activated!!!!")
 #     print("Ok you're all set :)")
 
-import torch
-from torch import nn
-import torch.nn.functional as F
-from torch.autograd import Function
+# if np.__version__ != '1.23.4':
+#     # print("Please use numpy version 1.23.4")
+#     # exit(1)
+#     print(f"{np.__version__ = }")
+#     raise EnvironmentError("Please use numpy version 1.23.4")
+# else:
+#     print(f"Using numpy version 1.23.4!")
+
+# if np.__version__ != 1.24:
+#     print(f"can't use jax. requires numpy version >= 1.24")
+# else:
+#     import jax.numpy as jnp
+#     from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
+#     from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
+
+
+import os
 
 import rclpy
 from rclpy.node import Node
@@ -32,48 +44,30 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from px4_msgs.msg import OffboardControlMode, VehicleRatesSetpoint, VehicleCommand, VehicleStatus, VehicleOdometry, TrajectorySetpoint, RcChannels
 from std_msgs.msg import Float64MultiArray
 
-# from tf_transformations import euler_from_quaternion
-# import transforms3d
+
 from transforms3d.euler import quat2euler
 
-import sympy as smp
 import math as m
-
-import scipy.integrate as sp_int
-import scipy.linalg as sp_linalg
-
 import numpy as np
-if np.__version__ != '1.23.4':
-    # print("Please use numpy version 1.23.4")
-    # exit(1)
-    print(f"{np.__version__ = }")
-    raise EnvironmentError("Please use numpy version 1.23.4")
-else:
-    print(f"Using numpy version 1.23.4!")
-
-if np.__version__ != 1.24:
-    print(f"can't use jax. requires numpy version >= 1.24")
-else:
-    import jax.numpy as jnp
-    from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
-    from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
+import sympy as smp
+# import scipy.integrate as sp_int
+# import scipy.linalg as sp_linalg
 
 import jax.numpy as jnp
 from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
 from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
-
-import time
-import ctypes
+from . jitted_nn_jac import *
 
 from pyJoules.handler.csv_handler import CSVHandler
 from pyJoules.device.rapl_device import RaplPackageDomain, RaplCoreDomain
 from pyJoules.energy_meter import EnergyContext
 
 import sys
+import time
+import ctypes
 import traceback
 from .Logger import Logger
 
-from . jitted_nn_jac import *
 
 class OffboardControl(Node):
     """Node for controlling a vehicle in offboard mode."""
@@ -511,6 +505,27 @@ class OffboardControl(Node):
     #     """
     #     return self.euler_from_matrix(self.quaternion_matrix(quaternion), axes)
     
+    def xeuler_from_quaternion(w, x, y, z):
+            """
+            Convert a quaternion into euler angles (roll, pitch, yaw)
+            roll is rotation around x in radians (counterclockwise)
+            pitch is rotation around y in radians (counterclockwise)
+            yaw is rotation around z in radians (counterclockwise)
+            """
+            t0 = +2.0 * (w * x + y * z)
+            t1 = +1.0 - 2.0 * (x * x + y * y)
+            roll_x = m.atan2(t0, t1)
+        
+            t2 = +2.0 * (w * y - z * x)
+            t2 = +1.0 if t2 > +1.0 else t2
+            t2 = -1.0 if t2 < -1.0 else t2
+            pitch_y = m.asin(t2)
+        
+            t3 = +2.0 * (w * z + x * y)
+            t4 = +1.0 - 2.0 * (y * y + z * z)
+            yaw_z = m.atan2(t3, t4)
+        
+            return roll_x, pitch_y, yaw_z # in radians
 
     def adjust_yaw(self, yaw):
         mocap_psi = yaw
@@ -548,8 +563,12 @@ class OffboardControl(Node):
         self.vy = msg.velocity[1]
         self.vz = msg.velocity[2]
 
-        # self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
-        self.roll, self.pitch, yaw = quat2euler(msg.q)
+        # self.roll, self.pitch, yaw = quat2euler(msg.q)
+        self.roll, self.pitch, yaw = self.xeuler_from_quaternion(*msg.q)
+        print(f"{msg.q = }")
+        print(f"{type(msg.q) = }")
+        exit(0)
+        self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
         self.yaw = self.adjust_yaw(yaw)
 
         self.p = msg.angular_velocity[0]
@@ -1621,8 +1640,6 @@ class OffboardControl(Node):
             PERIOD /= 2.0
 
         w = 2*m.pi / PERIOD
-
-
         r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -0.7, 0.0]]).T
 
         return r

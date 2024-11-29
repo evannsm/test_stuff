@@ -1,0 +1,14 @@
+[1.293s] Invoking command in '/home/factslabegmc/final_wardi_files/build/quad_newton_raphson': AMENT_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/factslabegmc/final_wardi_files/build/quad_newton_raphson/prefix_override:/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/lib/python3.8/site-packages:/home/factslabegmc/final_wardi_files/install/px4_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py develop --editable --build-directory /home/factslabegmc/final_wardi_files/build/quad_newton_raphson/build --no-deps install_data
+[1.509s] running develop
+[1.644s] running egg_info
+[1.644s] creating quad_newton_raphson.egg-info
+[1.653s] writing manifest file 'quad_newton_raphson.egg-info/SOURCES.txt'
+[1.654s] writing manifest file 'quad_newton_raphson.egg-info/SOURCES.txt'
+[1.685s] running build_ext
+[1.686s] running install_data
+[1.686s] creating /home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/ament_index
+[1.686s] creating /home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/ament_index/resource_index
+[1.686s] creating /home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/ament_index/resource_index/packages
+[1.686s] copying resource/quad_newton_raphson -> /home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/ament_index/resource_index/packages
+[1.686s] copying package.xml -> /home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson
+[1.708s] Invoked command in '/home/factslabegmc/final_wardi_files/build/quad_newton_raphson' returned '0': AMENT_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/factslabegmc/final_wardi_files/build/quad_newton_raphson/prefix_override:/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/lib/python3.8/site-packages:/home/factslabegmc/final_wardi_files/install/px4_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py develop --editable --build-directory /home/factslabegmc/final_wardi_files/build/quad_newton_raphson/build --no-deps install_data

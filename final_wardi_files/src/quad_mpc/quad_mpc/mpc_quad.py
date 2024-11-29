@@ -70,7 +70,7 @@ class OffboardControl(Node):
         self.mode_channel = 5
         self.pyjoules_on = int(input("Use PyJoules? 1 for Yes 0 for No: ")) #False
         if self.pyjoules_on:
-            self.csv_handler = CSVHandler('mpc_cpu_energy.csv')
+            self.csv_handler = CSVHandler('aggressive_mpc_cpu_energy.log')
 ###############################################################################################################################################
 
         # Configure QoS profile for publishing and subscribing
@@ -852,14 +852,14 @@ class OffboardControl(Node):
         t = np.linspace(t_start, t_start + self.horizon, self.num_steps)
 
         PERIOD = 13
-
+        PERIOD_Z = 13
         if self.double_speed:
-            PERIOD /= 2
+            PERIOD /= 2.0
+            PERIOD_Z /= 2.0
 
         w = 2 * np.pi / PERIOD
-        
-        PERIOD_Z = 13
         w_z = 2 * np.pi / PERIOD_Z
+
         z0 = 0.8
         height_variance = 0.3
 
@@ -889,14 +889,13 @@ class OffboardControl(Node):
         t = np.linspace(t_start, t_start + self.horizon, self.num_steps)
 
         PERIOD = 13
-        
         if self.double_speed:
             PERIOD /= 2
-
         w = 2 * np.pi / PERIOD
 
         PERIOD_Z = 13
         w_z = 2 * np.pi / PERIOD_Z
+        
         z0 = 0.8
         height_variance = 0.3
 

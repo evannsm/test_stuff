@@ -1,0 +1,304 @@
+[1.800s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'build', '--symlink-install']
+[1.800s] DEBUG:colcon:Parsed command line arguments: Namespace(allow_overriding=[], ament_cmake_args=None, base_paths=['.'], build_base='build', catkin_cmake_args=None, catkin_skip_building_tests=False, cmake_args=None, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, cmake_target=None, cmake_target_skip_unavailable=False, continue_on_error=False, event_handlers=None, executor='parallel', ignore_user_meta=False, install_base='install', log_base=None, log_level=None, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0x7f8d81fe9640>>, merge_install=False, metas=['./colcon.meta'], packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_end=None, packages_ignore=None, packages_ignore_regex=None, packages_select=None, packages_select_build_failed=False, packages_select_by_dep=None, packages_select_regex=None, packages_select_test_failures=False, packages_skip=None, packages_skip_build_finished=False, packages_skip_by_dep=None, packages_skip_regex=None, packages_skip_test_passed=False, packages_skip_up_to=None, packages_start=None, packages_up_to=None, packages_up_to_regex=None, parallel_workers=20, paths=None, symlink_install=True, test_result_base=None, verb_extension=<colcon_core.verb.build.BuildVerb object at 0x7f8d81fe9640>, verb_name='build', verb_parser=<colcon_defaults.argument_parser.defaults.DefaultArgumentsDecorator object at 0x7f8d8202bd60>)
+[1.872s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[1.872s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[1.872s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[1.872s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[1.872s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) discover
+[1.872s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[1.872s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/factslabegmc/final_wardi_files'
+[1.872s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ignore', 'ignore_ament_install']
+[1.872s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore'
+[1.872s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore_ament_install'
+[1.872s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_pkg']
+[1.872s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_pkg'
+[1.872s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_meta']
+[1.872s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_meta'
+[1.872s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ros']
+[1.872s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ros'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['cmake', 'python']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'cmake'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['python_setup_py']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python_setup_py'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extensions ['ignore', 'ignore_ament_install']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extension 'ignore'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(build) ignored
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extensions ['ignore', 'ignore_ament_install']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extension 'ignore'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extension 'ignore_ament_install'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extensions ['colcon_pkg']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extension 'colcon_pkg'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extensions ['colcon_meta']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extension 'colcon_meta'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extensions ['ros']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extension 'ros'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extensions ['cmake', 'python']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extension 'cmake'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extension 'python'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extensions ['python_setup_py']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code) by extension 'python_setup_py'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extensions ['ignore', 'ignore_ament_install']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extension 'ignore'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extension 'ignore_ament_install'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extensions ['colcon_pkg']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extension 'colcon_pkg'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extensions ['colcon_meta']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extension 'colcon_meta'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extensions ['ros']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extension 'ros'
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extensions ['cmake', 'python']
+[1.885s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extension 'cmake'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extension 'python'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extensions ['python_setup_py']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(holybro_mpc_c_generated_code/holybro_model) by extension 'python_setup_py'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extensions ['ignore', 'ignore_ament_install']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extension 'ignore'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(install) ignored
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extensions ['ignore', 'ignore_ament_install']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extension 'ignore'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(log) ignored
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['ignore', 'ignore_ament_install']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ignore'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ignore_ament_install'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['colcon_pkg']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'colcon_pkg'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['colcon_meta']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'colcon_meta'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['ros']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ros'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['cmake', 'python']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'cmake'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'python'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['python_setup_py']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'python_setup_py'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src/px4_msgs) by extensions ['ignore', 'ignore_ament_install']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src/px4_msgs) by extension 'ignore'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src/px4_msgs) by extension 'ignore_ament_install'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src/px4_msgs) by extensions ['colcon_pkg']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src/px4_msgs) by extension 'colcon_pkg'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src/px4_msgs) by extensions ['colcon_meta']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src/px4_msgs) by extension 'colcon_meta'
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src/px4_msgs) by extensions ['ros']
+[1.886s] Level 1:colcon.colcon_core.package_identification:_identify(src/px4_msgs) by extension 'ros'
+[1.888s] DEBUG:colcon.colcon_core.package_identification:Package 'src/px4_msgs' with type 'ros.ament_cmake' and name 'px4_msgs'
+[1.888s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_mpc) by extensions ['ignore', 'ignore_ament_install']
+[1.888s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_mpc) by extension 'ignore'
+[1.888s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_mpc) by extension 'ignore_ament_install'
+[1.888s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_mpc) by extensions ['colcon_pkg']
+[1.888s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_mpc) by extension 'colcon_pkg'
+[1.888s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_mpc) by extensions ['colcon_meta']
+[1.888s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_mpc) by extension 'colcon_meta'
+[1.888s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_mpc) by extensions ['ros']
+[1.888s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_mpc) by extension 'ros'
+[1.889s] DEBUG:colcon.colcon_core.package_identification:Package 'src/quad_mpc' with type 'ros.ament_python' and name 'quad_mpc'
+[1.889s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_newton_raphson) by extensions ['ignore', 'ignore_ament_install']
+[1.889s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_newton_raphson) by extension 'ignore'
+[1.889s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_newton_raphson) by extension 'ignore_ament_install'
+[1.889s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_newton_raphson) by extensions ['colcon_pkg']
+[1.889s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_newton_raphson) by extension 'colcon_pkg'
+[1.889s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_newton_raphson) by extensions ['colcon_meta']
+[1.889s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_newton_raphson) by extension 'colcon_meta'
+[1.889s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_newton_raphson) by extensions ['ros']
+[1.889s] Level 1:colcon.colcon_core.package_identification:_identify(src/quad_newton_raphson) by extension 'ros'
+[1.890s] DEBUG:colcon.colcon_core.package_identification:Package 'src/quad_newton_raphson' with type 'ros.ament_python' and name 'quad_newton_raphson'
+[1.890s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults
+[1.890s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) discover
+[1.890s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) using defaults
+[1.890s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) discover
+[1.890s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) using defaults
+[2.061s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) check parameters
+[2.061s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) discover
+[2.120s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 16 installed packages in /home/factslabegmc/mocap_ws/install
+[2.151s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 280 installed packages in /opt/ros/galactic
+[2.152s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) using defaults
+[2.241s] WARNING:colcon.colcon_core.package_selection:Some selected packages are already built in one or more underlay workspaces:
+	'px4_msgs' is in: /home/factslabegmc/mocap_ws/install/px4_msgs
+If a package in a merged underlay workspace is overridden and it installs headers, then all packages in the overlay must sort their include directories by workspace order. Failure to do so may result in build failures or undefined behavior at run time.
+If the overridden package is used by another package in any underlay, then the overriding package in the overlay must be API and ABI compatible or undefined behavior at run time may occur.
+
+If you understand the risks and want to override a package anyways, add the following to the command line:
+	--allow-overriding px4_msgs
+
+This may be promoted to an error in a future release of colcon-override-check.
+[2.271s] Level 5:colcon.colcon_core.verb:set package 'px4_msgs' build argument 'cmake_args' from command line to 'None'
+[2.271s] Level 5:colcon.colcon_core.verb:set package 'px4_msgs' build argument 'cmake_target' from command line to 'None'
+[2.272s] Level 5:colcon.colcon_core.verb:set package 'px4_msgs' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[2.272s] Level 5:colcon.colcon_core.verb:set package 'px4_msgs' build argument 'cmake_clean_cache' from command line to 'False'
+[2.272s] Level 5:colcon.colcon_core.verb:set package 'px4_msgs' build argument 'cmake_clean_first' from command line to 'False'
+[2.272s] Level 5:colcon.colcon_core.verb:set package 'px4_msgs' build argument 'cmake_force_configure' from command line to 'False'
+[2.272s] Level 5:colcon.colcon_core.verb:set package 'px4_msgs' build argument 'ament_cmake_args' from command line to 'None'
+[2.272s] Level 5:colcon.colcon_core.verb:set package 'px4_msgs' build argument 'catkin_cmake_args' from command line to 'None'
+[2.272s] Level 5:colcon.colcon_core.verb:set package 'px4_msgs' build argument 'catkin_skip_building_tests' from command line to 'False'
+[2.272s] DEBUG:colcon.colcon_core.verb:Building package 'px4_msgs' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/factslabegmc/final_wardi_files/build/px4_msgs', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/factslabegmc/final_wardi_files/install/px4_msgs', 'merge_install': False, 'path': '/home/factslabegmc/final_wardi_files/src/px4_msgs', 'symlink_install': True, 'test_result_base': None}
+[2.302s] Level 5:colcon.colcon_core.verb:set package 'quad_mpc' build argument 'cmake_args' from command line to 'None'
+[2.302s] Level 5:colcon.colcon_core.verb:set package 'quad_mpc' build argument 'cmake_target' from command line to 'None'
+[2.302s] Level 5:colcon.colcon_core.verb:set package 'quad_mpc' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[2.302s] Level 5:colcon.colcon_core.verb:set package 'quad_mpc' build argument 'cmake_clean_cache' from command line to 'False'
+[2.302s] Level 5:colcon.colcon_core.verb:set package 'quad_mpc' build argument 'cmake_clean_first' from command line to 'False'
+[2.302s] Level 5:colcon.colcon_core.verb:set package 'quad_mpc' build argument 'cmake_force_configure' from command line to 'False'
+[2.302s] Level 5:colcon.colcon_core.verb:set package 'quad_mpc' build argument 'ament_cmake_args' from command line to 'None'
+[2.302s] Level 5:colcon.colcon_core.verb:set package 'quad_mpc' build argument 'catkin_cmake_args' from command line to 'None'
+[2.302s] Level 5:colcon.colcon_core.verb:set package 'quad_mpc' build argument 'catkin_skip_building_tests' from command line to 'False'
+[2.302s] DEBUG:colcon.colcon_core.verb:Building package 'quad_mpc' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/factslabegmc/final_wardi_files/build/quad_mpc', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/factslabegmc/final_wardi_files/install/quad_mpc', 'merge_install': False, 'path': '/home/factslabegmc/final_wardi_files/src/quad_mpc', 'symlink_install': True, 'test_result_base': None}
+[2.332s] Level 5:colcon.colcon_core.verb:set package 'quad_newton_raphson' build argument 'cmake_args' from command line to 'None'
+[2.333s] Level 5:colcon.colcon_core.verb:set package 'quad_newton_raphson' build argument 'cmake_target' from command line to 'None'
+[2.333s] Level 5:colcon.colcon_core.verb:set package 'quad_newton_raphson' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[2.333s] Level 5:colcon.colcon_core.verb:set package 'quad_newton_raphson' build argument 'cmake_clean_cache' from command line to 'False'
+[2.333s] Level 5:colcon.colcon_core.verb:set package 'quad_newton_raphson' build argument 'cmake_clean_first' from command line to 'False'
+[2.333s] Level 5:colcon.colcon_core.verb:set package 'quad_newton_raphson' build argument 'cmake_force_configure' from command line to 'False'
+[2.333s] Level 5:colcon.colcon_core.verb:set package 'quad_newton_raphson' build argument 'ament_cmake_args' from command line to 'None'
+[2.333s] Level 5:colcon.colcon_core.verb:set package 'quad_newton_raphson' build argument 'catkin_cmake_args' from command line to 'None'
+[2.333s] Level 5:colcon.colcon_core.verb:set package 'quad_newton_raphson' build argument 'catkin_skip_building_tests' from command line to 'False'
+[2.333s] DEBUG:colcon.colcon_core.verb:Building package 'quad_newton_raphson' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/factslabegmc/final_wardi_files/build/quad_newton_raphson', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson', 'merge_install': False, 'path': '/home/factslabegmc/final_wardi_files/src/quad_newton_raphson', 'symlink_install': True, 'test_result_base': None}
+[2.362s] INFO:colcon.colcon_core.executor:Executing jobs using 'parallel' executor
+[2.394s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete
+[2.394s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/factslabegmc/final_wardi_files/src/px4_msgs' with build type 'ament_cmake'
+[2.394s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/factslabegmc/final_wardi_files/src/px4_msgs'
+[2.435s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[2.436s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[2.436s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[2.542s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/factslabegmc/final_wardi_files/build/px4_msgs': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/galactic /usr/bin/cmake /home/factslabegmc/final_wardi_files/src/px4_msgs -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/factslabegmc/final_wardi_files/install/px4_msgs
+[4.798s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/factslabegmc/final_wardi_files/build/px4_msgs' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/galactic /usr/bin/cmake /home/factslabegmc/final_wardi_files/src/px4_msgs -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/factslabegmc/final_wardi_files/install/px4_msgs
+[4.800s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/factslabegmc/final_wardi_files/build/px4_msgs': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/galactic /usr/bin/cmake --build /home/factslabegmc/final_wardi_files/build/px4_msgs -- -j20 -l20
+[115.472s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/factslabegmc/final_wardi_files/build/px4_msgs' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/galactic /usr/bin/cmake --build /home/factslabegmc/final_wardi_files/build/px4_msgs -- -j20 -l20
+[117.886s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/factslabegmc/final_wardi_files/build/px4_msgs': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/galactic /usr/bin/cmake --install /home/factslabegmc/final_wardi_files/build/px4_msgs
+[137.229s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(px4_msgs)
+[137.230s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/factslabegmc/final_wardi_files/build/px4_msgs' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/galactic /usr/bin/cmake --install /home/factslabegmc/final_wardi_files/build/px4_msgs
+[137.265s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs' for CMake module files
+[137.266s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs' for CMake config files
+[137.274s] Level 1:colcon.colcon_core.shell:create_environment_hook('px4_msgs', 'cmake_prefix_path')
+[137.309s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/cmake_prefix_path.ps1'
+[137.310s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/cmake_prefix_path.dsv'
+[137.311s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/cmake_prefix_path.sh'
+[137.311s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs/lib'
+[137.311s] Level 1:colcon.colcon_core.shell:create_environment_hook('px4_msgs', 'ld_library_path_lib')
+[137.343s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/ld_library_path_lib.ps1'
+[137.343s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/ld_library_path_lib.dsv'
+[137.343s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/ld_library_path_lib.sh'
+[137.343s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs/bin'
+[137.343s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs/lib/pkgconfig/px4_msgs.pc'
+[137.343s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs/lib/python3.8/site-packages'
+[137.344s] Level 1:colcon.colcon_core.shell:create_environment_hook('px4_msgs', 'pythonpath')
+[137.376s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/pythonpath.ps1'
+[137.377s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/pythonpath.dsv'
+[137.377s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/pythonpath.sh'
+[137.377s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs/bin'
+[137.412s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/package.ps1'
+[137.414s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/package.dsv'
+[137.414s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/package.sh'
+[137.415s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/package.bash'
+[137.416s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/package.zsh'
+[137.416s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/factslabegmc/final_wardi_files/install/px4_msgs/share/colcon-core/packages/px4_msgs)
+[139.528s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(px4_msgs)
+[139.565s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs' for CMake module files
+[139.565s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs' for CMake config files
+[139.573s] Level 1:colcon.colcon_core.shell:create_environment_hook('px4_msgs', 'cmake_prefix_path')
+[139.608s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/cmake_prefix_path.ps1'
+[139.609s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/cmake_prefix_path.dsv'
+[139.609s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/cmake_prefix_path.sh'
+[139.609s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs/lib'
+[139.609s] Level 1:colcon.colcon_core.shell:create_environment_hook('px4_msgs', 'ld_library_path_lib')
+[139.645s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/ld_library_path_lib.ps1'
+[139.645s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/ld_library_path_lib.dsv'
+[139.645s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/ld_library_path_lib.sh'
+[139.645s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs/bin'
+[139.645s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs/lib/pkgconfig/px4_msgs.pc'
+[139.646s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs/lib/python3.8/site-packages'
+[139.646s] Level 1:colcon.colcon_core.shell:create_environment_hook('px4_msgs', 'pythonpath')
+[139.683s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/pythonpath.ps1'
+[139.683s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/pythonpath.dsv'
+[139.684s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/hook/pythonpath.sh'
+[139.684s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/px4_msgs/bin'
+[139.717s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/package.ps1'
+[139.718s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/package.dsv'
+[139.718s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/package.sh'
+[139.719s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/package.bash'
+[139.719s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/px4_msgs/share/px4_msgs/package.zsh'
+[139.719s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/factslabegmc/final_wardi_files/install/px4_msgs/share/colcon-core/packages/px4_msgs)
+[139.719s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/factslabegmc/final_wardi_files/src/quad_mpc' with build type 'ament_python'
+[139.719s] Level 1:colcon.colcon_core.shell:create_environment_hook('quad_mpc', 'ament_prefix_path')
+[139.755s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/hook/ament_prefix_path.ps1'
+[139.755s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/hook/ament_prefix_path.dsv'
+[139.756s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/hook/ament_prefix_path.sh'
+[139.791s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[139.791s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[139.909s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/factslabegmc/final_wardi_files/src/quad_newton_raphson' with build type 'ament_python'
+[139.909s] Level 1:colcon.colcon_core.shell:create_environment_hook('quad_newton_raphson', 'ament_prefix_path')
+[139.945s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/hook/ament_prefix_path.ps1'
+[139.946s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/hook/ament_prefix_path.dsv'
+[139.946s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/hook/ament_prefix_path.sh'
+[139.982s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[139.982s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[140.314s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/factslabegmc/final_wardi_files/src/quad_mpc'
+[140.350s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[140.350s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[140.673s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/factslabegmc/final_wardi_files/src/quad_newton_raphson'
+[140.704s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[140.704s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[141.202s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/factslabegmc/final_wardi_files/build/quad_newton_raphson': AMENT_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/factslabegmc/final_wardi_files/build/quad_newton_raphson/prefix_override:/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/lib/python3.8/site-packages:/home/factslabegmc/final_wardi_files/install/px4_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py develop --editable --build-directory /home/factslabegmc/final_wardi_files/build/quad_newton_raphson/build --no-deps install_data
+[141.204s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/factslabegmc/final_wardi_files/build/quad_mpc': AMENT_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/factslabegmc/final_wardi_files/build/quad_mpc/prefix_override:/home/factslabegmc/final_wardi_files/install/quad_mpc/lib/python3.8/site-packages:/home/factslabegmc/final_wardi_files/install/px4_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py develop --editable --build-directory /home/factslabegmc/final_wardi_files/build/quad_mpc/build --no-deps install_data
+[141.617s] Level 1:colcon.colcon_core.shell:create_environment_hook('quad_newton_raphson', 'pythonpath_develop')
+[141.618s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/factslabegmc/final_wardi_files/build/quad_newton_raphson' returned '0': AMENT_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/factslabegmc/final_wardi_files/build/quad_newton_raphson/prefix_override:/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/lib/python3.8/site-packages:/home/factslabegmc/final_wardi_files/install/px4_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py develop --editable --build-directory /home/factslabegmc/final_wardi_files/build/quad_newton_raphson/build --no-deps install_data
+[141.655s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/build/quad_newton_raphson/share/quad_newton_raphson/hook/pythonpath_develop.ps1'
+[141.656s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/build/quad_newton_raphson/share/quad_newton_raphson/hook/pythonpath_develop.dsv'
+[141.656s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/build/quad_newton_raphson/share/quad_newton_raphson/hook/pythonpath_develop.sh'
+[141.693s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson' for CMake module files
+[141.694s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson' for CMake config files
+[141.694s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/lib'
+[141.694s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/bin'
+[141.694s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/lib/pkgconfig/quad_newton_raphson.pc'
+[141.694s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/lib/python3.8/site-packages'
+[141.694s] Level 1:colcon.colcon_core.shell:create_environment_hook('quad_newton_raphson', 'pythonpath')
+[141.731s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/hook/pythonpath.ps1'
+[141.732s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/hook/pythonpath.dsv'
+[141.732s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/hook/pythonpath.sh'
+[141.732s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/bin'
+[141.732s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(quad_newton_raphson)
+[141.770s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/package.ps1'
+[141.770s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/package.dsv'
+[141.771s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/package.sh'
+[141.771s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/package.bash'
+[141.771s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/quad_newton_raphson/package.zsh'
+[141.771s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/factslabegmc/final_wardi_files/install/quad_newton_raphson/share/colcon-core/packages/quad_newton_raphson)
+[141.771s] Level 1:colcon.colcon_core.shell:create_environment_hook('quad_mpc', 'pythonpath_develop')
+[141.773s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/factslabegmc/final_wardi_files/build/quad_mpc' returned '0': AMENT_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/home/factslabegmc/final_wardi_files/install/px4_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/factslabegmc/final_wardi_files/build/quad_mpc/prefix_override:/home/factslabegmc/final_wardi_files/install/quad_mpc/lib/python3.8/site-packages:/home/factslabegmc/final_wardi_files/install/px4_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py develop --editable --build-directory /home/factslabegmc/final_wardi_files/build/quad_mpc/build --no-deps install_data
+[141.819s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/build/quad_mpc/share/quad_mpc/hook/pythonpath_develop.ps1'
+[141.819s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/build/quad_mpc/share/quad_mpc/hook/pythonpath_develop.dsv'
+[141.819s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/build/quad_mpc/share/quad_mpc/hook/pythonpath_develop.sh'
+[141.856s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_mpc' for CMake module files
+[141.856s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_mpc' for CMake config files
+[141.856s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_mpc/lib'
+[141.856s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_mpc/bin'
+[141.856s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_mpc/lib/pkgconfig/quad_mpc.pc'
+[141.856s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_mpc/lib/python3.8/site-packages'
+[141.856s] Level 1:colcon.colcon_core.shell:create_environment_hook('quad_mpc', 'pythonpath')
+[141.893s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/hook/pythonpath.ps1'
+[141.894s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/hook/pythonpath.dsv'
+[141.894s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/hook/pythonpath.sh'
+[141.894s] Level 1:colcon.colcon_core.environment:checking '/home/factslabegmc/final_wardi_files/install/quad_mpc/bin'
+[141.894s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(quad_mpc)
+[141.931s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/package.ps1'
+[141.932s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/package.dsv'
+[141.932s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/package.sh'
+[141.933s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/package.bash'
+[141.933s] INFO:colcon.colcon_core.shell:Creating package script '/home/factslabegmc/final_wardi_files/install/quad_mpc/share/quad_mpc/package.zsh'
+[141.933s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/factslabegmc/final_wardi_files/install/quad_mpc/share/colcon-core/packages/quad_mpc)
+[141.933s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:closing loop
+[141.933s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:loop closed
+[141.933s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete finished with '0'
+[141.933s] DEBUG:colcon.colcon_core.event_reactor:joining thread
+[141.982s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[141.982s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[141.982s] INFO:colcon.colcon_notification.desktop_notification:Sending desktop notification using 'notify2'
+[141.996s] DEBUG:colcon.colcon_core.event_reactor:joined thread
+[142.031s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/factslabegmc/final_wardi_files/install/local_setup.ps1'
+[142.032s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/factslabegmc/final_wardi_files/install/_local_setup_util_ps1.py'
+[142.033s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/factslabegmc/final_wardi_files/install/setup.ps1'
+[142.070s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/factslabegmc/final_wardi_files/install/local_setup.sh'
+[142.070s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/factslabegmc/final_wardi_files/install/_local_setup_util_sh.py'
+[142.070s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/factslabegmc/final_wardi_files/install/setup.sh'
+[142.106s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/factslabegmc/final_wardi_files/install/local_setup.bash'
+[142.107s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/factslabegmc/final_wardi_files/install/setup.bash'
+[142.143s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/factslabegmc/final_wardi_files/install/local_setup.zsh'
+[142.144s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/factslabegmc/final_wardi_files/install/setup.zsh'

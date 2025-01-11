@@ -39,7 +39,7 @@ import numpy as np
 import jax.numpy as jnp
 from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
 from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
-from . jitted_nn_jac import *
+from .jitted_nn_jac import *
 
 import torch
 from torch import nn
@@ -166,18 +166,30 @@ class OffboardControl(Node):
         self.use_quat_yaw = True
         # print(f"{'Using quaternion for yaw error' if self.use_quat_yaw else 'Using angle for yaw error'}")
 
-        self.pred_type = int(input("JaxNonlin, Neural Network, or C-CompiledNonlin -based Predictor? Write 3 for Jax, 2 for NN, and 0 for Nonlinear: "))
-        print(f"Predictor #{self.pred_type}: Using {'Jax' if self.pred_type == 3 else 'NN' if self.pred_type == 2 else 'Linear' if self.pred_type == 1 else 'Nonlinear'} Predictor")
+        self.pred_type = int(input("C-Compiled, Jax, or Flatness-based Prediction? Write 2 for C-Compiled, 1 for Jax, 0 for Flatness: "))
+        predictor_map = {
+            2: "C-Compiled",
+            1: "Jax",
+            0: "Flatness",
+        }
+        try:
+            predictor_type = predictor_map[self.pred_type]
+        except KeyError:
+            print(f"Invalid predictor type: {self.pred_type}")
+            exit(1)
+
+        print(f"Predictor #{self.pred_type}: Using {predictor_type} Predictor")
 
         self.C = self.observer_matrix() #Calculate Observer Matrix Needed After Predictions of all States to Get Only the States We Need in Output
 
-        # self.nonlin0 = False
-        if self.pred_type == 0 or self.pred_type == 3: #For Nonlinear & Jax Predictors
+        self.nonlin0 = False
+        if self.pred_type == 2 or self.pred_type == 1: #For C-Compiled & Jax Predictors
+            # self.nonlin0 = bool(int(input("Use 0-Order Hold for Nonlinear Predictor? Press 1 for Yes and 0 for No: ")))
             self.nonlin0 = True # use 0-order hold for now
-            # self.nonlin0 = not bool(int(input("Press 0 for 0-Order Hold and 1 for 1st-Order Hold: ")))
 
-        if self.pred_type == 0: #Nonlinear Predictor
-            # print("Using Nonlinear Predictor")
+
+
+        if self.pred_type == 2: #C-Compiled Predictor
             class Vector9x1(ctypes.Structure):
                 _fields_ = [
                     ('x', ctypes.c_double),
@@ -224,78 +236,17 @@ class OffboardControl(Node):
                 print(f"NONLIN LIB PATH: {nonlin_path}")
                 # exit(0)
             self.my_library.performCalculations.restype = ctypes.POINTER(Vector9x1)
+        elif self.pred_type == 1: #Jax Predictor
+            pass
+        elif self.pred_type == 0: #Flatness Predictor
+            self.df_init = False
+        else:
+            print(f"Invalid Predictor Type: {self.pred_type}")
+            exit(1)
 
-        if self.pred_type == 1: #Linear Predictor
-            # print("Using Linear Predictor")
-            self.linearized_model() #Calculate Linearized Model Matrices      
-            # print(f"{self.jac_inv=}")   
-            """
-            Jac =array([[ 0.        ,  0.        , -0.83677867,  0.        ],
-                        [ 0.        ,  0.83677867,  0.        ,  0.        ],
-                        [ 0.20846906,  0.        ,  0.        ,  0.        ],
-                        [ 0.        ,  0.        ,  0.        ,  0.8       ]])
-
-            """
-            """self.jac_inv=array( [[ 0.        ,  0.        ,  4.796875  ,  0.        ],
-                                    [ 0.        ,  1.19505915,  0.        ,  0.        ],
-                                    [-1.19505915, -0.        , -0.        , -0.        ],
-                                    [ 0.        ,  0.        ,  0.        ,  1.25      ]])
-            """
-            # exit(0)   
-
-        if self.pred_type == 2: #Jax Neural Network Predictor
-            print("Using Jax Feedforward NN")
-            self.nonlin0 = False
-            x = np.random.randn(9)
-            u = np.random.randn(4)
-            self.apply_model = apply_model
-            self.compute_inv_jac = compute_inv_jac
-            self.apply_model(x,u)
-            self.compute_inv_jac(x,u)
-            # compute_jacobian(x,u)
-            print("succeeded")
-            # exit(0)
-
-        if self.pred_type == 5: #Neural Network Predictor
-            print("Using Feedforward NN")
-            # Load NN predictor:
-            class FeedForward(nn.Module):
-                def __init__(self, input_size = 13, output_size = 4):
-                    super().__init__()
-                    self.feedfwd_stack = nn.Sequential(
-                        nn.Linear(input_size, 64),
-                        nn.Linear(64, output_size)
-                    )
-                def forward(self, x):
-                    logits = self.feedfwd_stack(x)
-                    return logits
-                
-            self.NN = FeedForward()
-            base_path = os.path.dirname(os.path.abspath(__file__))        # Get the directory where the script is located
-            ff_path_hardware = os.path.join(base_path, 'holybro_ff.pt')
-            ff_path_sim = os.path.join(base_path, 'sim_ff.pt')
-            if self.sim:
-                self.NN.load_state_dict(torch.load(ff_path_sim))
-            else:
-                self.NN.load_state_dict(torch.load(ff_path_hardware))
-
-        # if np.__version__ != 1.24:
-        #     if self.pred_type == 3: #Jax Predictor
-        #         print("Can't use Jax. Requires numpy version >= 1.24")
-        #         exit(1)
-        # elif np.__version__ == 1.24:
-        #     if self.pred_type == 3: #Jax Predictor
-        #         print("Using Jax")
-        #         if self.nonlin0:
-        #             print("Using Jax 0 Order Hold Predictor")
-        #         else:
-        #             print("Using Jax 1stOrder Hold Predictor")
-        #             self.udot = np.array([[0, 0, 0, 0]], dtype=np.float64).T
-        # else:
-        #     print("Can't use Jax. requires numpy version >= 1.24")
 
         self.metadata = np.array(['Sim' if self.sim else 'Hardware',
-                                  'Jax' if self.pred_type == 3 else 'NN' if self.pred_type == 2 else 'Linear' if self.pred_type == 1 else 'Nonlinear',
+                                  'C-Compiled' if self.pred_type == 2 else 'Jax' if self.pred_type == 1 else 'Flatness',
                                   '2x Speed' if self.double_speed else '1x Speed',
                                   '0OrderHold' if self.nonlin0 else '1stOrderHold',
                                   'QuatYawError' if self.use_quat_yaw else 'EulerYawError',
@@ -564,6 +515,17 @@ class OffboardControl(Node):
 
         self.state_vector = np.array([[self.x, self.y, self.z, self.vx, self.vy, self.vz, self.roll, self.pitch, self.yaw]]).T 
         self.nr_state = np.array([[self.x, self.y, self.z, self.yaw]]).T
+
+        # for flatness-based predictor
+        if self.pred_type == 0 and not self.df_init:
+            sigma0 = np.array([self.x, self.y, self.z, self.yaw]).reshape(4,1)
+            sigmad0 = np.array([self.vx, self.vy, self.vz, 0]).reshape(4,1)
+            sigmadd0 = np.zeros((4, 1))
+            self.x_df = np.vstack([sigma0, sigmad0, sigmadd0])
+            self.u_df = np.zeros((4, 1))
+            self.df_init = True
+
+
         # print(f"State Vector: {self.state_vector}")
         # print(f"NR State: {self.nr_state}")
 
@@ -676,12 +638,13 @@ class OffboardControl(Node):
 
 #~~~~~~~~~~~~~~~ Calculate reference trajectory ~~~~~~~~~~~~~~~
         if self.time_from_start <= self.cushion_time:
-            reffunc = self.hover_ref_func(1)
+            reffunc = self.hover_ref_func(3)
         elif self.cushion_time < self.time_from_start < self.cushion_time + self.flight_time:
-            reffunc = self.circle_horz_ref_func()
+            # self.hover_ref_func(3)
+            # reffunc = self.circle_horz_ref_func()
             # reffunc = self.circle_horz_spin_ref_func()
             # reffunc = self.circle_vert_ref_func()
-            # reffunc = self.fig8_horz_ref_func()
+            reffunc = self.fig8_horz_ref_func()
             # reffunc = self.fig8_vert_ref_func_short()
             # reffunc = self.fig8_vert_ref_func_tall()
             # reffunc = self.helix()
@@ -690,12 +653,12 @@ class OffboardControl(Node):
             # reffunc = self.sawtooth()
 
         elif self.cushion_time + self.flight_time <= self.time_from_start <= self.time_before_land:
-            reffunc = self.hover_ref_func(1)
+            reffunc = self.hover_ref_func(3)
         else:
-            reffunc = self.hover_ref_func(1)
+            reffunc = self.hover_ref_func(3)
 
 
-        # reffunc = self.hover_ref_func(1)
+        # reffunc = self.hover_ref_func(3)
         # reffunc = self.sawtooth()
         # reffunc = self.triangle()
         # reffunc = self.yawing_only()
@@ -790,9 +753,17 @@ class OffboardControl(Node):
         print("######################################################################")
         if self.pyjoules_on:
             with EnergyContext(handler=self.csv_handler, domains=[RaplPackageDomain(0), RaplCoreDomain(0)]):
-                new_u = self.get_new_NR_input_execution_function(last_input, reffunc)
+                if self.pred_type != 0:
+                    new_u = self.get_new_NR_input_execution_function(last_input, reffunc)
+                else:
+                    print(f"Getting Flat Prediction and Input Calculation")
+                    new_u = self.get_flat_predict(last_input)       
         else:
-            new_u = self.get_new_NR_input_execution_function(last_input, reffunc)
+            if self.pred_type != 0:
+                new_u = self.get_new_NR_input_execution_function(last_input, reffunc)
+            else:
+                print(f"Getting Flat Prediction and Input Calculation")
+                new_u = self.get_flat_predict(last_input, reffunc)
         return new_u
 
     def quaternion_from_yaw(self, yaw):
@@ -850,7 +821,7 @@ class OffboardControl(Node):
     
     def get_tracking_error(self, reffunc, pred):
         # print(f"reffunc: {reffunc}")
-        print(f"pred: {pred}")
+        # print(f"pred: {pred}")
         err = reffunc - pred
         # # current_yaw = pred[3][0] # current yaw angle
         # # desired_yaw = reffunc[3][0] # desired yaw angle
@@ -864,19 +835,15 @@ class OffboardControl(Node):
     def get_new_NR_input_execution_function(self,last_input,reffunc): # Executes Newton-Rapshon Control Algorithm -- gets called by get_new_NR_input either with or without pyjoules
         """ Calculates the Newton-Raphson Control Input. """
         nrt0 = time.time() # time before NR calculations
-        if self.pred_type == 1:
-            print(f"Getting Linear Prediction")
-            pred = self.getyorai_g_linear_predict(last_input) # predicts system output state T_lookahead seconds in the future
-        elif self.pred_type == 0:
+        if self.pred_type == 2: # C-compiled prediction
             print(f"{'Getting Numerically Integrated 0-Order Hold Nonlinear Model Prediction' if self.nonlin0 else 'Getting Numerically Integrated 1-Order Hold Nonlinear Model Prediction'} ")
             pred = self.get_nonlin_predict_compiled(last_input) # predicts system output state T_lookahead seconds in the future
-        elif self.pred_type == 2:
-            print(f"Getting NN Prediction")
-            pred = self.get_nn_predict(last_input)
-        elif self.pred_type == 3:
+        elif self.pred_type == 1: # Jax prediction
             print(f"Getting Jax Prediction")
             pred = self.get_jax_predict(last_input)
+
         self.pred_timel_array.append(time.time() - nrt0)
+
 
 
         error = self.get_tracking_error(reffunc, pred) # calculates tracking error
@@ -984,11 +951,16 @@ class OffboardControl(Node):
         # alpha=np.array([[45,45,45,45]]).T # Speed-up parameter (maybe play with uniform alpha values rather than ones that change for each input)
 
         u = last_input + alpha * change_u # u_new = u_old + alpha * change_u
- 
+
         nr_time_elapsed = time.time()-nrt0
         self.nr_timel_array.append(nr_time_elapsed)
+
+
         print(f"NR_time_elapsed: {nr_time_elapsed}, Good For {1/nr_time_elapsed} Hz")
         self.udot = udot
+
+        print(f"{u = }")
+        # exit(1)
         return u
 
 
@@ -1034,83 +1006,7 @@ class OffboardControl(Node):
             # print(f"{type(adjusted_invjac) = }")
             self.jac_inv = adjusted_invjac
             return outputs
-        
-    def get_nn_predict(self, last_input): #Predicts System Output State Using Neural Network
-        position_now = np.array(self.state_vector.T.tolist()[0])
-        # position_now[-1] = self.adjust_yaw(position_now[-1])
-        curr_thrust = -last_input[0][0]
-        curr_rolldot = last_input[1][0]
-        curr_pitchdot = last_input[2][0]
-        curr_yawdot = last_input[3][0]
-        
-        input_data = np.array([curr_thrust, curr_rolldot, curr_pitchdot, curr_yawdot])
-        
-        outputNN = self.apply_model(position_now, input_data)
-        inv_jac, cond, cond2 = self.compute_inv_jac(position_now, input_data)
-
-        outputs = np.array(outputNN).reshape(-1, 1)
-        print(f"\n")
-        print(f"{cond = }")
-        print(f"{cond2 = }")
-        print(f"\n")
-
-        self.jac_inv = inv_jac
-        return outputs
-
-
-
-
-    def get_nn_predict2(self, last_input): #Predicts System Output State Using Neural Network
-        """ Predicts the system output state using a feedforward neural network. """
-        position_now = self.state_vector.T.tolist()[0]
-        curr_thrust = -last_input[0][0]
-        curr_rolldot = last_input[1][0]
-        curr_pitchdot = last_input[2][0]
-        curr_yawdot = last_input[3][0]
-        input_data = [curr_thrust, curr_rolldot, curr_pitchdot, curr_yawdot]
-        # print(f"position_now: {position_now}")
-        # print(f"input_data: {input_data}")
-
-        # Concatenate state vector and input vector
-        state_vector = torch.tensor(position_now, dtype=torch.float32)
-        input_vector = torch.tensor(input_data, dtype=torch.float32, requires_grad=True)
-        dataNN = torch.cat([state_vector, input_vector])
-        # print(f"dataNN: {dataNN}")
-
-        # print("Feed Forward NN")
-        # t1 = time.time()
-        outputNN = self.NN(dataNN)
-        # print(f"outputNN: {outputNN}")
-
-        # Compute Jacobian
-        jacobian = torch.zeros((4, 4))
-        # print(input_vector.grad)
-        # input_vector.grad.zero_()
-
-        for i in range(4):
-            self.NN.zero_grad()  # Reset gradients to zero
-            if outputNN.grad is not None:
-                outputNN.grad.zero_()
-            outputNN[i].backward(retain_graph=True)  # Compute gradients
-            jacobian[i] = input_vector.grad
-
-        # print("Jacobian Matrix:\n", jacobian)
-
-        inv_jac = np.linalg.inv(jacobian)
-        # print(f"inv_jac: {inv_jac}")
-        inv_jac[:, 2] = -inv_jac[:, 2]
-        # print(f"inv_jac: {inv_jac}")
-
-        self.jac_inv = inv_jac
-
-        outputNN = outputNN.detach().numpy()
-        outputNN = np.array([[outputNN[0], outputNN[1], outputNN[2], outputNN[3]]]).T
-        # print(f"{outputNN=}")
-        # print(f"outputNN.shape: {outputNN.shape}")
-        # print(f"outputNN: {outputNN}")
-        return outputNN
-        # exit(0)
-    
+ 
     def get_nonlin_predict_compiled(self, last_input): #Predicts System Output State Using Numerically Integrated Nonlinear Model
         """ Compiled in C: Predicts the system output state using a numerically integrated nonlinear model. """
 
@@ -1493,27 +1389,149 @@ class OffboardControl(Node):
         nonlin_pred = np.array([[x, y, z, vx, vy, vz, roll, pitch, yaw]]).T
         outputs = self.C @ nonlin_pred
         return outputs
+
+    def get_flat_predict(self, last_input, reffunc): #Predicts System Output State Using Differential Flatness
+        """ Predicts the system output state using differential flatness. """
+        last_input = np.array([-last_input[0][0], last_input[1][0], last_input[2][0], last_input[3][0]]).reshape(4,1)
+
+        nrt0 = time.time() # time before NR calculations
+
+        curr_x, curr_y, curr_z, curr_yaw = self.x, self.y, self.z, self.yaw
+        curr_vx, curr_vy, curr_vz = self.vx, self.vy, self.vz
+        curr_yawdot = last_input[3][0]
+
+        T_lookahead = self.T_LOOKAHEAD
+        step = self.newton_raphson_timer_period
+
+        z1 = np.array([[curr_x, curr_y, curr_z, curr_yaw]]).T
+        z2 = np.array([[curr_vx, curr_vy, curr_vz, curr_yawdot]]).T
+        z3 = self.x_df[8:12]
+        print(f"{z1 = }")
+        print(f"{z2 = }")
+        print(f"{z3 = }")
+
+        dgdu_inv = (2/T_lookahead**2) * np.eye(4)
+        # print(f"{dgdu_inv = }")
+        alpha = np.array([[20,30,30,30]]).T
+        # print(f"{self.u_df = }")
+        pred = z1 + z2*T_lookahead + (1/m.factorial(2))*z3*T_lookahead**2 # + (1/m.factorial(3))*self.u_df*T_lookahead**3
+        self.pred_timel_array.append(time.time() - nrt0)
+        print(f"{pred = }")
+        # print(f"{T_lookahead = }")
+        ref = reffunc
+        print(f"{ref = }")
+
+        error = self.get_tracking_error(ref, pred)
+        NR = dgdu_inv @ error
+        u_df = alpha * NR
+        self.u_df = u_df
+        print(f"{error = }")
+        print(f"{u_df = }")
+        # print(f"{step = }")
+
+        A_df = np.block([
+                    [np.zeros((4,4)), np.eye(4), np.zeros((4,4))],
+                    [np.zeros((4,4)), np.zeros((4,4)), np.eye(4)],
+                    [np.zeros((4,4)), np.zeros((4,4)), np.zeros((4,4))]
+                    ])
+        
+        B_df = np.block([
+                    [np.zeros((4,4))],
+                    [np.zeros((4,4))],
+                    [np.eye(4)]
+                    ])
+        x_dot_df = A_df @ self.x_df + B_df @ u_df
+        # print(f"{x_dot_df[4:] = }")
+        # print(f"{self.x_df[4:] = }")
+        self.x_df = self.x_df + x_dot_df * step
+        # print(f"{self.x_df[4:] = }")
+        sigma = self.x_df[0:4]
+        sigmad1 = self.x_df[4:8]
+        sigmad2 = self.x_df[8:12]
+        sigmad3 = u_df
+
+        a1 = np.array([[1,0,0]]).T
+        a2 = np.array([[0,1,0]]).T
+        a3 = np.array([[0,0,1]]).T
+
+        print(f"{sigmad2[0:3] = }")
+        grav_vector = self.GRAVITY * a3
+        print(f"{grav_vector = }")
+        accels = sigmad2[0:3] - self.GRAVITY*a3
+        print(f"{accels = }")
+        # print(f"{self.MASS = }")
+        # print(f"{np.linalg.norm(accels) = }")
+        # thrust = self.MASS * accels[2][0]# TODO: FILL IN WITH EQUATION 10 in Vector field following for quadrotors using differential flatness
+        thrust = -self.MASS * np.linalg.norm(accels)
+        print(f"{thrust = }")
+        thrust_max = -0.5 # max thrust (force) value to limit thrust to
+        thrust_min = -27.0 # min thrust (force) value to limit thrust to
+        clipped_thrust = np.clip(thrust, thrust_min, thrust_max)
+        # clipped_thrust = thrust
+        print(f"{clipped_thrust = }")
+        x = \
+        """ matlab referece:
+            val = sigmad2(1:3) + g*a3;
+            b3 = val / norm(val)
+
+            e1 = cos(ref(4))*a1 + sin(ref(4))*a2;
+
+            val2 = cross(b3, e1, 1);
+            b2 = val2 / norm(val2)
+            b1 = cross(b2, b3, 1)
+
+            R = [b1, b2, b3]
+
+            j = sigmad3(1:3)
+            val3 = (j - (j'*b3)*b3)
+            p = -b2' * (m/thrust) * val3
+            q = b1' * (m/thrust) * val3
+            r = 0;
+        """
     
+        b3 = accels / np.linalg.norm(accels)
+        # print(f"{b3 = }")
+        e1 = np.array([[m.cos(ref[3]), m.sin(ref[3]), 0]]).T
+        # print(f"{e1 = }")
+        val2 = np.cross(b3, e1, axis=0)
+        # print(f"{val2 = }")
+        b2 = val2 / np.linalg.norm(val2)
+        # print(f"{b2 = }")
+        b1 = np.cross(b2, b3, axis=0)
+        # print(f"{b1 = }")
 
+        R = np.hstack([b1, b2, b3])
 
-# ~~ The following functions produce the linearized model matrices that we use for prediction and NR input calculation ~~
-    def getyorai_g_linear_predict(self, curr_input): #Calculates Linearized System Output Prediction ([x,y,z,yaw])
-        """ Predicts the system output state using the closed form equation for an LTI system.  """
-        gravity = np.array([[self.MASS * self.GRAVITY, 0, 0, 0]]).T #gravity vector that counteracts input vector: [-mg, 0, 0, 0]
-        # unforced = self.eAT @ self.state_vector
-        # print(f"{unforced = }")
-        # forced = self.int_eATB @ (curr_input + gravity)
-        # print(f"{forced = }")
-        lin_pred = self.eAT@self.state_vector + self.int_eATB @ (curr_input + gravity) # xdot = eAT*x(t) + int_eATB*(u-gravity)
-        yorai_g = self.C @ lin_pred # y(t) = C*x(t) = [x,y,z,yaw]
-        return yorai_g
+        j = sigmad3[0:3]
+        # print(f"{j = }")
+        # print(f"{b3 = }")
+        val3 = (j - (j.T @ b3) * b3)
+        # print(f"{val3 = }")
+        print(f"{self.MASS/thrust = }")
+        print(f"{b2.T @ val3= }")
+        print(f"{b2.T @ ((self.MASS/thrust) * val3) = }")
+        p = (b2.T @ ((self.MASS/thrust) * val3)).item()
+        q = (b1.T @ ((self.MASS/thrust) * val3)).item()
+        yaw_err = self.shortest_path_yaw_quaternion(self.yaw, ref[3][0].item())
+        print(f"{yaw_err = }")
+        r = yaw_err * 0.5
+        max_rate = 0.8
+        r = np.clip(r, -max_rate, max_rate)
+        p = np.clip(p, -max_rate, max_rate)
+        q = np.clip(q, -max_rate, max_rate)
 
-    def getyorai_gJac_linear_predict(self): #Calculates Jacobian of Linearized System Output Prediction for Newton-Raphson Input Calc : udot = a*inv(dg/du)(err)
-        """ Calculates the Jacobian of the closed form linearized system output prediction wrt inputs at the operating point of hover above origin with euler angles 0. """
-        Jac = np.concatenate((self.int_eATB[0:3, :], self.int_eATB[-1:, :]), axis=0) # dg/du = C * int_eATB
-        print(f"{Jac =}")
-        return Jac
-    
+        print(f"{p = }")
+        print(f"{q = }")
+        print(f"{r = }")
+
+        u = np.array([[clipped_thrust, p, q, r]]).T
+        print(f"{u = }")
+        # exit(1)
+
+        nr_time_elapsed = time.time()-nrt0
+        self.nr_timel_array.append(nr_time_elapsed)
+        return u
+ 
     def observer_matrix(self): #Calculates Observer Matrix for Prediction of desired outputs from all 9 states
         """ Calculates the observer matrix for prediction of desired outputs from all 9 states. """
         C = np.array([[1, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -1522,71 +1540,6 @@ class OffboardControl(Node):
                 [0, 0, 0, 0, 0, 0, 0, 0, 1]])
         return C
     
-    def linearized_model(self): #Calculates Linearized Model Matrices for Prediction (eAT, int_eATB, int_eAT, C)
-        """ Calculates the linearized model matrices for prediction. """
-
-        # x(t) = eAT*x(t0) + int_eATB*u(t) with u(t) = u over T = T_lookahead seconds
-        # simplifies to x(t) = eAT*x(t) + int_eATB*(u - gravity) in our implementation as seen in getyorai_g_linear_predict
-        # y(t) = C*x(t)
-
-        A = smp.Matrix(
-            [
-                [0, 0, 0,    1, 0, 0,     0,   0, 0],
-                [0, 0, 0,    0, 1, 0,     0,   0, 0],
-                [0, 0, 0,    0, 0, 1,     0,   0, 0],
-
-                [0, 0, 0,    0, 0, 0,     0,-1*self.GRAVITY, 0],
-                [0, 0, 0,    0, 0, 0,     self.GRAVITY,   0, 0],
-                [0, 0, 0,    0, 0, 0,     0,   0, 0],
-
-                [0, 0, 0,    0, 0, 0,     0,   0, 0],
-                [0, 0, 0,    0, 0, 0,     0,   0, 0],
-                [0, 0, 0,    0, 0, 0,     0,   0, 0],
-
-            ]
-            )
-        
-        eAT = smp.exp(A*self.T_LOOKAHEAD)
-
-        B = smp.Matrix(
-            [
-                [0, 0, 0, 0],
-                [0, 0, 0, 0],
-                [0, 0, 0, 0],
-                [0, 0, 0, 0],
-                [0, 0, 0, 0],
-
-                [1/self.MASS, 0, 0, 0],
-                [0, 1, 0, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1],
-            ]
-            )
-
-        A = np.array(A).astype(np.float64)
-        int_eAT = np.zeros_like(A)
-        rowcol = int_eAT.shape[0]
-        for row in range(rowcol):
-            for column in range(rowcol):
-                f = lambda x: sp_linalg.expm(A*(self.T_LOOKAHEAD-x))[row,column]
-                int_eAT[row,column] = sp_int.quad(f, 0, self.T_LOOKAHEAD)[0]
-
-
-        int_eATB = int_eAT @ B
-        eAT = np.array(eAT).astype(np.float64)
-        int_eATB = np.array(int_eATB).astype(np.float64)
-
-        # print(f"A: \n {A}")
-        # print(f"eAT: \n {eAT}")
-        # print(f"int_eAT: \n {int_eAT}")
-
-        # print(f"B: \n {B}")
-        # print(f"int_eATB: \n {int_eATB}")
-        # print(f"C: \n {C}")
-        self.eAT = eAT
-        self.int_eATB = int_eATB
-        self.int_eAT = int_eAT
-        self.jac_inv = np.linalg.inv(self.getyorai_gJac_linear_predict()) #Calculate Inverse Jacobian of Linearized Model Matrices
 
 
 
@@ -1594,14 +1547,15 @@ class OffboardControl(Node):
     def hover_ref_func(self, num): #Returns Constant Hover Reference Trajectories At A Few Different Positions ([x,y,z,yaw])
         """ Returns constant hover reference trajectories at a few different positions. """
         hover_dict = {
-            1: np.array([[0.0, 0.0, -0.6, 0.0]]).T,
-            2: np.array([[0.0, 0.8, -0.8, 0.0]]).T,
-            3: np.array([[0.8, 0.0, -0.8, 0.0]]).T,
-            4: np.array([[0.8, 0.8, -0.8, 0.0]]).T,
+            1: np.array([[0.0, 0.0, -0.6, self.yaw]]).T,
+            2: np.array([[0.0, 0.8, -0.8, self.yaw]]).T,
+            3: np.array([[0.8, 0.0, -0.8, self.yaw]]).T,
+            4: np.array([[0.8, 0.8, -0.8, self.yaw]]).T,
             5: np.array([[0.0, 0.0, -10.0, 0.0]]).T,
             6: np.array([[1.0, 1.0, -4.0, 0.0]]).T,
             7: np.array([[3.0, 4.0, -5.0, 0.0]]).T,
             8: np.array([[1.0, 1.0, -3.0, 0.0]]).T,
+            9: np.array([[0.,0.,-(0.8*np.sin((2*np.pi/5)*(time.time()))+1.0),0.]]).T,
         }
         if num > len(hover_dict) or num < 1:
             print(f"hover_dict #{num} not found")
@@ -1745,7 +1699,7 @@ class OffboardControl(Node):
         t_traj = self.time_from_start - self.cushion_time
         t = t_traj + self.T_LOOKAHEAD
 
-        PERIOD = 13 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
+        PERIOD = 15 # used to have w=.5 which is rougly PERIOD = 4*pi ~= 12.56637
 
         if self.double_speed:
             PERIOD /= 2.0
@@ -1757,7 +1711,7 @@ class OffboardControl(Node):
         z0 = 0.8
         height_variance = 0.3
 
-        SPIN_PERIOD = 15
+        SPIN_PERIOD = 40
         yaw_ref = (t) / (SPIN_PERIOD / (2*m.pi))
 
         r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -1*(z0 + height_variance * m.sin(w_z * t)), yaw_ref]]).T
@@ -1773,7 +1727,7 @@ class OffboardControl(Node):
         SPIN_PERIOD = 15
         
         yaw_ref = (t) / (SPIN_PERIOD / (2*m.pi))
-        r = np.array([[0., 0., -0.5, yaw_ref]]).T
+        r = np.array([[0., 0., -0.7, yaw_ref]]).T
         return r
         
     def interpolate_sawtooth(self, t, num_repeats):

@@ -3,8 +3,13 @@ setup.cfg
 setup.py
 quad_newton_raphson/Logger.py
 quad_newton_raphson/__init__.py
-quad_newton_raphson/jitted_pred_jac.py
+quad_newton_raphson/full_jax_nr_quad.py
+quad_newton_raphson/full_jax_nr_quad_utilities.py
+quad_newton_raphson/nr_diff_flat.py
 quad_newton_raphson/nr_quad.py
+quad_newton_raphson/nr_quad_JAX_NN_utilities.py
+quad_newton_raphson/nr_quad_JAX_utilities.py
+quad_newton_raphson/optimization_method.py
 quad_newton_raphson.egg-info/PKG-INFO
 quad_newton_raphson.egg-info/SOURCES.txt
 quad_newton_raphson.egg-info/dependency_links.txt

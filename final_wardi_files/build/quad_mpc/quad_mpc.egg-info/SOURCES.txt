@@ -4,6 +4,7 @@ setup.py
 quad_mpc/Logger.py
 quad_mpc/__init__.py
 quad_mpc/mpc_quad.py
+quad_mpc/usingtinympc.py
 quad_mpc/workingGenMPC.py
 quad_mpc/workingModel.py
 quad_mpc.egg-info/PKG-INFO

@@ -26,5 +26,6 @@
         "/home/factslabegmc/mocap_ws/install/mocap_marker_viz_srvs/lib/python3.8/site-packages",
         "/home/factslabegmc/mocap_ws/install/mocap_control_msgs/lib/python3.8/site-packages",
         "/opt/ros/galactic/lib/python3.8/site-packages"
-    ]
+    ],
+    "cmake.sourceDirectory": "/home/factslabegmc/final_wardi_files/src/quad_mpc/quad_mpc/generated_code/build/temp.linux-x86_64-3.8/_deps/pybind11-src/tests/test_cmake_build/installed_function"
 }

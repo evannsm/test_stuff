@@ -37,9 +37,9 @@ import scipy.linalg as sp_linalg
 
 import numpy as np
 import jax.numpy as jnp
-from .jitted_pred_jac import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
-from .jitted_pred_jac import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
-from .jitted_nn_jac import *
+from .nr_quad_JAX_utilities import predict_outputs, predict_states, compute_jacobian, compute_adjusted_invjac
+from .nr_quad_JAX_utilities import predict_outputs_1order, predict_states_1order, compute_jacobian_1order, compute_adjusted_invjac_1order
+from .nr_quad_JAX_NN_utilities import *
 
 import torch
 from torch import nn

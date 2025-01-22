@@ -157,20 +157,19 @@ class OffboardControl(Node):
         self.INTEGRATION_STEP = 0.01 #integration step for NR controller
         first_thrust = self.MASS * self.GRAVITY # Initialize first input for hover at origin
 
-        self.pred_type = 4 # '1' for jax_reg_wardi, '2' for jax_optim_wardi, '3' for jax_pred_jac_only, '4' for linear predictor
+        self.pred_type = 1 # '1' for jax_reg_wardi, '2' for jax_optim_wardi, '3' for jax_pred_jac_only, '4' for linear predictor
         STATE = jnp.array([[0., 0., 0., 0., 0., 0., 0., 0., 0.]]).T
-        INPUT = jnp.array([[first_thrust, 0., 0., 0.]]).T
+        INPUT = jnp.array([[self.MASS * self.GRAVITY, 0., 0., 0.]]).T
         ref = np.array([[0, 0, -0.8, 0]]).T
         if self.pred_type ==1 :
             print("Using jax_reg_wardi")
-            self.u0 = NR_tracker_original(STATE, INPUT, ref, self.T_LOOKAHEAD, self.STEP_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS) #(currstate, currinput, ref, T_lookahead, integration_step, sim_step, mass):
+            self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T    
         elif self.pred_type == 2:
             print("Using jax_optim_wardi")
-            self.u0 = NR_tracker_optim(STATE, INPUT, ref, self.T_LOOKAHEAD, self.STEP_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS)
+            self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
         elif self.pred_type == 3:
             print("Using jax_pred_jac_only")
             self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
-
         elif self.pred_type == 4:
             print("Using linear predictor")
             self.C = self.observer_matrix() #Calculate Observer Matrix Needed After Predictions of all States to Get Only the States We Need in Output
@@ -189,7 +188,8 @@ class OffboardControl(Node):
             """
             self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
 
-        print(f"self.u0: {self.u0}")
+        print(f"here - self.u0: {self.u0}\n")
+        # print(f'hiii')
         # exit(0)
 ###############################################################################################################################################
         self.use_quat_yaw = True
@@ -524,8 +524,8 @@ class OffboardControl(Node):
         if self.time_from_start <= self.cushion_time:
             reffunc = self.hover_ref_func(1)
         elif self.cushion_time < self.time_from_start < self.cushion_time + self.flight_time:
-            reffunc = self.circle_horz_ref_func()
-            # reffunc = self.circle_horz_spin_ref_func()
+            # reffunc = self.circle_horz_ref_func()
+            reffunc = self.circle_horz_spin_ref_func()
             # reffunc = self.circle_vert_ref_func()
             # reffunc = self.fig8_horz_ref_func()
             # reffunc = self.fig8_vert_ref_func_short()
@@ -538,7 +538,7 @@ class OffboardControl(Node):
             reffunc = self.hover_ref_func(1)
         else:
             reffunc = self.hover_ref_func(1)
-        # reffunc = np.array([[4, 0., -0.5, 0.]]).T
+        reffunc = np.array([[0., 0., -10., 0.]]).T
         print(f"reffunc: {reffunc}")
 
         # Calculate the Newton-Rapshon control input and transform the force into a throttle command for publishing to the vehicle
@@ -678,17 +678,27 @@ class OffboardControl(Node):
             err[3][0] = self.shortest_path_yaw(pred[3][0], reffunc[3][0])
         return err
     
-    def execute_cbf(self, current, phi, max, min, gamma):
-        v = 0.0 # influence value initialized to 0 as default for if no CBF is needed        
-        if current >= 0:
-            zeta = gamma * (max - current) - phi
-            if zeta < 0:
-                v = zeta
-        if current < 0:
-            zeta = gamma * (min - current) - phi
-            if zeta > 0:
-                v = zeta
+
+    # def execute_cbf(self, current, phi, max, min, gamma):
+    #     v = 0.0 # influence value initialized to 0 as default for if no CBF is needed        
+    #     if current >= 0:
+    #         zeta = gamma * (max - current) - phi
+    #         if zeta < 0:
+    #             v = zeta
+    #     if current < 0:
+    #         zeta = gamma * (min - current) - phi
+    #         if zeta > 0:
+    #             v = zeta
+    #     return v
+
+
+    def execute_cbf(self, current, phi, max_value, min_value, gamma):
+        zeta_max = gamma * (max_value - current) - phi
+        zeta_min = gamma * (min_value - current) - phi
+
+        v = np.where(current >= 0, np.minimum(0, zeta_max), np.maximum(0, zeta_min))
         return v
+
     
     def integral_cbf(self, last_input, phi):
         print("INTEGRAL CBF IMPLEMENTATION")
@@ -725,6 +735,7 @@ class OffboardControl(Node):
         print(f"{v = }")
         return v
     
+
     def get_new_NR_input_execution_function(self, last_input, ref): # Executes Newton-Rapshon Control Algorithm -- gets called by get_new_NR_input either with or without pyjoules
         """ Calculates the Newton-Raphson Control Input. """
         nrt0 = time.time()
@@ -732,11 +743,12 @@ class OffboardControl(Node):
         INPUT = jnp.array([last_input[0][0], last_input[1][0], last_input[2][0], last_input[3][0]]).reshape(4,1)
         print(f"{STATE = }")
         print(f"{INPUT = }")
-        if self.pred_type ==1 :
+        if self.pred_type == 1 :
             print("Using Original Wardi All Jax") #0-order hold prediction
-            u = NR_tracker_original(STATE, INPUT, ref, self.T_LOOKAHEAD, self.STEP_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS) #(currstate, currinput, ref, T_lookahead, integration_step, sim_step, mass):
+            u, v = NR_tracker_original(STATE, INPUT, ref, self.T_LOOKAHEAD, self.STEP_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS) #(currstate, currinput, ref, T_lookahead, integration_step, sim_step, mass):
             nr_time_elapsed = time.time() - nrt0
             print(f"NR_time_elapsed: {nr_time_elapsed}, Good For {1/nr_time_elapsed} Hz")
+            print(f"v: {v}")
             print(f"u: {u}")
 
             self.pred_timel_array.append(nr_time_elapsed)

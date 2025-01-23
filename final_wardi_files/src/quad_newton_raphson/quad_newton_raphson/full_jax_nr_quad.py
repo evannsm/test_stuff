@@ -39,7 +39,7 @@ import numpy as np
 import jax.numpy as jnp
 
 
-from .full_jax_nr_quad_utilities import NR_tracker_original, NR_tracker_optim, predict_output, get_inv_jac_pred_u
+from .full_jax_nr_quad_utilities import NR_tracker_original, NR_tracker_optim, predict_output, get_inv_jac_pred_u, NR_tracker_linpred, NR_tracker_flat
 
 import torch
 from torch import nn
@@ -153,24 +153,25 @@ class OffboardControl(Node):
 
         self.GRAVITY = 9.806 #gravity
         self.T_LOOKAHEAD = .8 #lookahead time for prediction and reference tracking in NR controller
-        self.STEP_LOOKAHEAD = 0.1 #step lookahead for prediction and reference tracking in NR controller
+        self.LOOKAHEAD_STEP = 0.1 #step lookahead for prediction and reference tracking in NR controller
         self.INTEGRATION_STEP = 0.01 #integration step for NR controller
         first_thrust = self.MASS * self.GRAVITY # Initialize first input for hover at origin
-
-        self.pred_type = 1 # '1' for jax_reg_wardi, '2' for jax_optim_wardi, '3' for jax_pred_jac_only, '4' for linear predictor
+        # '1' for jax_reg_wardi, '2' for jax_optim_wardi, '3' for jax_pred_jac_only, '4' for linear predictor normal,
+        # '5' for linear predictor with jax, '6' for flat wardi normal, '7' for flat wardi with jax
+        self.ctrl_type = 7
         STATE = jnp.array([[0., 0., 0., 0., 0., 0., 0., 0., 0.]]).T
         INPUT = jnp.array([[self.MASS * self.GRAVITY, 0., 0., 0.]]).T
         ref = np.array([[0, 0, -0.8, 0]]).T
-        if self.pred_type ==1 :
+        if self.ctrl_type ==1 :
             print("Using jax_reg_wardi")
             self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T    
-        elif self.pred_type == 2:
+        elif self.ctrl_type == 2:
             print("Using jax_optim_wardi")
             self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
-        elif self.pred_type == 3:
+        elif self.ctrl_type == 3:
             print("Using jax_pred_jac_only")
             self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
-        elif self.pred_type == 4:
+        elif self.ctrl_type == 4:
             print("Using linear predictor")
             self.C = self.observer_matrix() #Calculate Observer Matrix Needed After Predictions of all States to Get Only the States We Need in Output
             self.eAT, self.int_eATB, self.jac_inv = self.linearized_model() #Calculate Linearized Model Matrices      
@@ -187,14 +188,24 @@ class OffboardControl(Node):
                                     [ 0.        ,  0.        ,  0.        ,  1.25      ]])
             """
             self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
-
+        elif self.ctrl_type == 5:
+            print("Using linear predictor with jax")
+            self.C = self.observer_matrix() #Calculate Observer Matrix Needed After Predictions of all States to Get Only the States We Need in Output
+            self.eAT, self.int_eATB, self.jac_inv = self.linearized_model() #Calculate Linearized Model Matrices      
+            self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
+        elif self.ctrl_type == 6:
+            print("Using flat wardi normal")
+            self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
+        elif self.ctrl_type == 7:
+            print("Using flat wardi with jax")
+            self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
         print(f"here - self.u0: {self.u0}\n")
         # print(f'hiii')
         # exit(0)
 ###############################################################################################################################################
         self.use_quat_yaw = True
         self.metadata = np.array(['Sim' if self.sim else 'Hardware',
-                                  'jax_reg_wardi' if self.pred_type == 1 else 'jax_optim_wardi' if self.pred_type == 2 else 'jax_pred_jac_only' if self.pred_type == 3 else 'linear predictor',
+                                  'jax_reg_wardi' if self.ctrl_type == 1 else 'jax_optim_wardi' if self.ctrl_type == 2 else 'jax_pred_jac_only' if self.ctrl_type == 3 else 'linear predictor' if self.ctrl_type == 4 else 'linear predictor with jax' if self.ctrl_type == 5 else 'flat wardi normal' if self.ctrl_type == 6 else 'flat wardi with jax' if self.ctrl_type == 7 else 'Unknown',
                                   '2x Speed' if self.double_speed else '1x Speed',
                                   'QuatYawError' if self.use_quat_yaw else 'EulerYawError',
                                   ])
@@ -406,6 +417,11 @@ class OffboardControl(Node):
 
         self.state_vector = np.array([[self.x, self.y, self.z, self.vx, self.vy, self.vz, self.roll, self.pitch, self.yaw]]).T 
         self.nr_state = np.array([[self.x, self.y, self.z, self.yaw]]).T
+
+        if self.first_iteration:
+            self.x_df = np.array([[self.x, self.y, self.z, self.yaw, self.vx, self.vy, self.vz, 0., 0., 0., 0., 0.]]).T
+            print(f"First iteration: set initial flat state as {self.x_df = }")
+            # exit(0)
         # print(f"State Vector: {self.state_vector}")
         # print(f"NR State: {self.nr_state}")
 
@@ -522,10 +538,10 @@ class OffboardControl(Node):
 
 #~~~~~~~~~~~~~~~ Calculate reference trajectory ~~~~~~~~~~~~~~~
         if self.time_from_start <= self.cushion_time:
-            reffunc = self.hover_ref_func(1)
+            reffunc = self.hover_ref_func(2)
         elif self.cushion_time < self.time_from_start < self.cushion_time + self.flight_time:
-            # reffunc = self.circle_horz_ref_func()
-            reffunc = self.circle_horz_spin_ref_func()
+            reffunc = self.circle_horz_ref_func()
+            # reffunc = self.circle_horz_spin_ref_func()
             # reffunc = self.circle_vert_ref_func()
             # reffunc = self.fig8_horz_ref_func()
             # reffunc = self.fig8_vert_ref_func_short()
@@ -538,7 +554,7 @@ class OffboardControl(Node):
             reffunc = self.hover_ref_func(1)
         else:
             reffunc = self.hover_ref_func(1)
-        reffunc = np.array([[0., 0., -10., 0.]]).T
+        # reffunc = np.array([[0., 0., -10., 0.]]).T
         print(f"reffunc: {reffunc}")
 
         # Calculate the Newton-Rapshon control input and transform the force into a throttle command for publishing to the vehicle
@@ -739,13 +755,13 @@ class OffboardControl(Node):
     def get_new_NR_input_execution_function(self, last_input, ref): # Executes Newton-Rapshon Control Algorithm -- gets called by get_new_NR_input either with or without pyjoules
         """ Calculates the Newton-Raphson Control Input. """
         nrt0 = time.time()
-        STATE = jnp.array([self.state_vector[0][0], self.state_vector[1][0], self.state_vector[2][0], self.state_vector[3][0], self.state_vector[4][0], self.state_vector[5][0], self.state_vector[6][0], self.state_vector[7][0], self.state_vector[8][0]]).reshape(9,1)
-        INPUT = jnp.array([last_input[0][0], last_input[1][0], last_input[2][0], last_input[3][0]]).reshape(4,1)
+        STATE = np.array([self.state_vector[0][0], self.state_vector[1][0], self.state_vector[2][0], self.state_vector[3][0], self.state_vector[4][0], self.state_vector[5][0], self.state_vector[6][0], self.state_vector[7][0], self.state_vector[8][0]]).reshape(9,1)
+        INPUT = np.array([last_input[0][0], last_input[1][0], last_input[2][0], last_input[3][0]]).reshape(4,1)
         print(f"{STATE = }")
         print(f"{INPUT = }")
-        if self.pred_type == 1 :
+        if self.ctrl_type == 1 :
             print("Using Original Wardi All Jax") #0-order hold prediction
-            u, v = NR_tracker_original(STATE, INPUT, ref, self.T_LOOKAHEAD, self.STEP_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS) #(currstate, currinput, ref, T_lookahead, integration_step, sim_step, mass):
+            u, v = NR_tracker_original(STATE, INPUT, ref, self.T_LOOKAHEAD, self.LOOKAHEAD_STEP, self.INTEGRATION_STEP, self.MASS) #(currstate, currinput, ref, T_lookahead, integration_step, sim_step, mass):
             nr_time_elapsed = time.time() - nrt0
             print(f"NR_time_elapsed: {nr_time_elapsed}, Good For {1/nr_time_elapsed} Hz")
             print(f"v: {v}")
@@ -754,9 +770,9 @@ class OffboardControl(Node):
             self.pred_timel_array.append(nr_time_elapsed)
             self.nr_timel_array.append(nr_time_elapsed)
             return u
-        elif self.pred_type == 2:
+        elif self.ctrl_type == 2:
             print("Using Optim Wardi All Jax") #0-order hold prediction
-            u = NR_tracker_optim(STATE, INPUT, ref, self.T_LOOKAHEAD, self.STEP_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS)
+            u = NR_tracker_optim(STATE, INPUT, ref, self.T_LOOKAHEAD, self.LOOKAHEAD_STEP, self.INTEGRATION_STEP, self.MASS)
             nr_time_elapsed = time.time() - nrt0
             print(f"NR_time_elapsed: {nr_time_elapsed}, Good For {1/nr_time_elapsed} Hz")
             print(f"u: {u}")
@@ -764,7 +780,7 @@ class OffboardControl(Node):
             self.pred_timel_array.append(nr_time_elapsed)
             self.nr_timel_array.append(nr_time_elapsed)
             return u 
-        elif self.pred_type == 3:
+        elif self.ctrl_type == 3:
             print("Using Jax for Pred and Jacobian Only for Original Wardi") #0-order hold prediction
             pred = np.array(predict_output(STATE, INPUT, self.T_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS)).reshape(-1,1)
             dgdu = np.array(get_inv_jac_pred_u(STATE, INPUT, self.T_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS))
@@ -783,7 +799,7 @@ class OffboardControl(Node):
             print(f"NR_time_elapsed: {nr_time_elapsed}, Good For {1/nr_time_elapsed} Hz")
             print(f"u: {u}")
             return u
-        elif self.pred_type == 4:
+        elif self.ctrl_type == 4:
             print("Using Linearized Predictor for Wardi")
             gravity = np.array([[self.MASS * self.GRAVITY, 0, 0, 0]]).T #gravity vector that counteracts input vector: [-mg, 0, 0, 0]
             # STATE = np.array([self.state_vector[0][0], self.state_vector[1][0], self.state_vector[2][0], self.state_vector[3][0], self.state_vector[4][0], self.state_vector[5][0], self.state_vector[6][0], self.state_vector[7][0], self.state_vector[8][0]]).reshape(9,1)
@@ -805,9 +821,143 @@ class OffboardControl(Node):
             print(f"NR_time_elapsed: {nr_time_elapsed}, Good For {1/nr_time_elapsed} Hz")
             print(f"u: {u}")
             return u
-        elif self.pred_type == 5:
-            print("Using Flat Wardi")
+        elif self.ctrl_type == 5:
+            print(f"Using Linearized Predictor for Wardi in Jax")
+            u, v = NR_tracker_linpred(STATE, INPUT, ref, self.INTEGRATION_STEP, self.MASS, self.eAT, self.int_eATB, self.jac_inv) #(currstate, currinput, ref, T_lookahead, integration_step, sim_step, mass):
+            nr_time_elapsed = time.time() - nrt0
+            print(f"NR_time_elapsed: {nr_time_elapsed}, Good For {1/nr_time_elapsed} Hz")
+            print(f"v: {v}")
+            print(f"u: {u}")
 
+            self.pred_timel_array.append(nr_time_elapsed)
+            self.nr_timel_array.append(nr_time_elapsed)
+            return u
+        
+        elif self.ctrl_type == 6:
+            print(f"Using Differentially Flat System for Wardi")
+            u, self.x_df = self.get_NR_flat_synthesis(STATE, INPUT, self.x_df, ref, self.T_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS)
+            nr_time_elapsed = time.time() - nrt0
+            print(f"NR_time_elapsed: {nr_time_elapsed}, Good For {1/nr_time_elapsed} Hz")
+            print(f"u: {u}")
+
+            self.pred_timel_array.append(nr_time_elapsed)
+            self.nr_timel_array.append(nr_time_elapsed)
+            return u
+        elif self.ctrl_type == 7:
+            print(f"Using Differentially Flat System for Wardi in Jax")
+            u, self.x_df = NR_tracker_flat(STATE, INPUT, self.x_df, ref, self.T_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS)
+            # clipped_thrust, p, q, r, x_df = NR_tracker_flat(STATE, INPUT, self.x_df, ref, self.T_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS)
+            # print(f"{clipped_thrust = }")
+            # print(f"{p = }")
+            # print(f"{q = }")
+            # print(f"{r = }")
+            # print(f"{x_df = }")
+            nr_time_elapsed = time.time() - nrt0
+            print(f"NR_time_elapsed: {nr_time_elapsed}, Good For {1/nr_time_elapsed} Hz")
+            print(f"u: {u}")
+            # exit(0)
+            self.pred_timel_array.append(nr_time_elapsed)
+            self.nr_timel_array.append(nr_time_elapsed)
+            return u
+        
+    def get_NR_flat_synthesis(self, STATE, INPUT, x_df, ref, T_lookahead, step, MASS):
+
+        curr_x, curr_y, curr_z, curr_yaw = STATE[0][0], STATE[1][0], STATE[2][0], STATE[-1][0]
+        curr_vx, curr_vy, curr_vz = STATE[3][0], STATE[4][0], STATE[5][0]
+        curr_yawdot = INPUT[3][0]
+
+        T_lookahead = self.T_LOOKAHEAD
+        step = self.newton_raphson_timer_period
+
+        z1 = np.array([[curr_x, curr_y, curr_z, curr_yaw]]).T
+        z2 = np.array([[curr_vx, curr_vy, curr_vz, curr_yawdot]]).T
+        z3 = x_df[8:12]
+        # print(f"{z1 = }")
+        # print(f"{z2 = }")
+        # print(f"{z3 = }")
+
+        dgdu_inv = (2/T_lookahead**2) * np.eye(4)
+        alpha = np.array([[20,30,30,30]]).T
+        pred = z1 + z2*T_lookahead + (1/2)*z3*T_lookahead**2
+        # print(f"{pred = }")
+        # print(f"{ref = }")
+        error = self.get_tracking_error(ref, pred)
+        # print(f"{error = }")
+        NR = dgdu_inv @ error
+        u_df = alpha * NR
+        self.u_df = u_df
+        # print(f"{u_df = }")
+
+        A_df = np.block([
+                    [np.zeros((4,4)), np.eye(4), np.zeros((4,4))],
+                    [np.zeros((4,4)), np.zeros((4,4)), np.eye(4)],
+                    [np.zeros((4,4)), np.zeros((4,4)), np.zeros((4,4))]
+                    ])
+        
+        B_df = np.block([
+                    [np.zeros((4,4))],
+                    [np.zeros((4,4))],
+                    [np.eye(4)]
+                    ])
+        x_dot_df = A_df @ x_df + B_df @ u_df
+        x_df = x_df + x_dot_df * step
+        # print(f"{self.x_df[4:] = }")
+        sigma = x_df[0:4]
+        sigmad1 = x_df[4:8]
+        sigmad2 = x_df[8:12]
+        sigmad3 = u_df
+
+        a1 = np.array([[1,0,0]]).T
+        a2 = np.array([[0,1,0]]).T
+        a3 = np.array([[0,0,-1]]).T
+
+        # print(f"{sigmad2[0:3] = }")
+        grav_vector = self.GRAVITY * a3
+        # print(f"{grav_vector = }")
+        accels = sigmad2[0:3] + self.GRAVITY*a3
+        # print(f"{accels = }")
+
+        thrust = MASS * np.linalg.norm(accels)
+        # print(f"{thrust = }")
+
+        thrust_max = 27.0
+        thrust_min = 0.5
+        clipped_thrust = np.clip(thrust, thrust_min, thrust_max)
+        # print(f"{clipped_thrust = }")
+
+        b3 = accels / np.linalg.norm(accels)
+        # print(f"{b3 = }")
+        e1 = np.array([[1., 0., 0.]]).T
+        # print(f"{e1 = }")
+        val2 = np.cross(b3, e1, axis=0)
+        # print(f"{val2 = }")
+        b2 = val2 / np.linalg.norm(val2)
+        # print(f"{b2 = }")
+        b1 = np.cross(b2, b3, axis=0)
+        # print(f"{b1 = }")
+
+        j = sigmad3[0:3]
+        # print(f"{j = }")
+
+        val3 = (j - (j.T @ b3) * b3)
+        # print(f"{val3 = }")    
+
+        # print(f"{MASS / clipped_thrust = }")
+        # print(f"{b2.T @ val3 = }")
+        # print(f"{b2.T @ ((MASS / thrust) * val3) = }")
+        p = (b2.T @ ((self.MASS/-clipped_thrust) * val3)).item()
+        q = (b1.T @ ((self.MASS/-clipped_thrust) * val3)).item()
+        yaw_err = self.shortest_path_yaw_quaternion(curr_yaw, ref[3][0].item())
+        print(f"{yaw_err = }")
+        r = yaw_err * 0.5
+        max_rate = 0.8
+        r = np.clip(r, -max_rate, max_rate)
+        p = np.clip(p, -max_rate, max_rate)
+        q = np.clip(q, -max_rate, max_rate)
+        # print(f"{p = }, {q = }, {r = }")
+        u = np.array([[clipped_thrust, p, q, r]]).T
+        # print(f"{u = }")
+        return u, x_df
 
     def observer_matrix(self): #Calculates Observer Matrix for Prediction of desired outputs from all 9 states
         """ Calculates the observer matrix for prediction of desired outputs from all 9 states. """
@@ -864,7 +1014,6 @@ class OffboardControl(Node):
                 f = lambda x: sp_linalg.expm(A*(T_LOOKAHEAD-x))[row,column]
                 int_eAT[row,column] = sp_int.quad(f, 0, T_LOOKAHEAD)[0]
 
-
         int_eATB = int_eAT @ B
         eAT = np.array(eAT).astype(np.float64)
         int_eATB = np.array(int_eATB).astype(np.float64) 
@@ -878,14 +1027,15 @@ class OffboardControl(Node):
     def hover_ref_func(self, num): #Returns Constant Hover Reference Trajectories At A Few Different Positions ([x,y,z,yaw])
         """ Returns constant hover reference trajectories at a few different positions. """
         hover_dict = {
-            1: np.array([[0.0, 0.0, -0.6, 0.0]]).T,
-            2: np.array([[0.0, 0.8, -0.8, 0.0]]).T,
-            3: np.array([[0.8, 0.0, -0.8, 0.0]]).T,
-            4: np.array([[0.8, 0.8, -0.8, 0.0]]).T,
+            1: np.array([[0.0, 0.0, -0.6, self.yaw]]).T,
+            2: np.array([[0.0, 0.8, -0.8, self.yaw]]).T,
+            3: np.array([[0.8, 0.0, -0.8, self.yaw]]).T,
+            4: np.array([[0.8, 0.8, -0.8, self.yaw]]).T,
             5: np.array([[0.0, 0.0, -10.0, 0.0]]).T,
             6: np.array([[1.0, 1.0, -4.0, 0.0]]).T,
             7: np.array([[3.0, 4.0, -5.0, 0.0]]).T,
             8: np.array([[1.0, 1.0, -3.0, 0.0]]).T,
+            9: np.array([[0.,0.,-(0.8*np.sin((2*np.pi/5)*(time.time()))+1.0),0.]]).T,
         }
         if num > len(hover_dict) or num < 1:
             print(f"hover_dict #{num} not found")
@@ -898,7 +1048,7 @@ class OffboardControl(Node):
             
         print(f"hover_dict #{num}")
         return hover_dict.get(num)
-    
+   
     def circle_horz_ref_func(self): #Returns Circle Reference Trajectory in Horizontal Plane ([x,y,z,yaw])
         """ Returns circle reference trajectory in horizontal plane. """
         print("circle_horz_ref_func")

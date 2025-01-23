@@ -638,7 +638,7 @@ class OffboardControl(Node):
 
 #~~~~~~~~~~~~~~~ Calculate reference trajectory ~~~~~~~~~~~~~~~
         if self.time_from_start <= self.cushion_time:
-            reffunc = self.hover_ref_func(3)
+            reffunc = self.hover_ref_func(1)
         elif self.cushion_time < self.time_from_start < self.cushion_time + self.flight_time:
             # self.hover_ref_func(3)
             # reffunc = self.circle_horz_ref_func()
@@ -1393,7 +1393,7 @@ class OffboardControl(Node):
     def get_flat_predict(self, last_input, reffunc): #Predicts System Output State Using Differential Flatness
         """ Predicts the system output state using differential flatness. """
         last_input = np.array([-last_input[0][0], last_input[1][0], last_input[2][0], last_input[3][0]]).reshape(4,1)
-
+        print(f"{last_input = }")
         nrt0 = time.time() # time before NR calculations
 
         curr_x, curr_y, curr_z, curr_yaw = self.x, self.y, self.z, self.yaw
@@ -1469,7 +1469,6 @@ class OffboardControl(Node):
         clipped_thrust = np.clip(thrust, thrust_min, thrust_max)
         # clipped_thrust = thrust
         print(f"{clipped_thrust = }")
-        x = \
         """ matlab referece:
             val = sigmad2(1:3) + g*a3;
             b3 = val / norm(val)

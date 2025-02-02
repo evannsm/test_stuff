@@ -31,13 +31,10 @@ from std_msgs.msg import Float64MultiArray
 
 import sympy as smp
 import math as m
-
 import scipy.integrate as sp_int
 import scipy.linalg as sp_linalg
-
 import numpy as np
 import jax.numpy as jnp
-
 
 from .full_jax_nr_quad_utilities import NR_tracker_original, NR_tracker_optim, predict_output, get_inv_jac_pred_u, NR_tracker_linpred, NR_tracker_flat
 
@@ -68,9 +65,9 @@ class OffboardControl(Node):
 ###############################################################################################################################################
 
         # Figure out if in simulation or hardware mode to set important variables to the appropriate values
-        self.sim = True# bool(int(input("Are you using the simulator? Write 1 for Sim and 0 for Hardware: ")))
+        self.sim = bool(int(input("Are you using the simulator? Write 1 for Sim and 0 for Hardware: ")))
         print(f"{'SIMULATION' if self.sim else 'HARDWARE'}")
-        self.double_speed = False# bool(int(input("Double Speed Trajectories? Press 1 for Yes and 0 for No: ")))
+        self.double_speed = bool(int(input("Double Speed Trajectories? Press 1 for Yes and 0 for No: ")))
 
         self.ctrl_loop_time_log = []
         self.x_log, self.y_log, self.z_log, self.yaw_log = [], [], [], []
@@ -155,10 +152,14 @@ class OffboardControl(Node):
         self.T_LOOKAHEAD = .8 #lookahead time for prediction and reference tracking in NR controller
         self.LOOKAHEAD_STEP = 0.1 #step lookahead for prediction and reference tracking in NR controller
         self.INTEGRATION_STEP = 0.01 #integration step for NR controller
-        first_thrust = self.MASS * self.GRAVITY # Initialize first input for hover at origin
+
+###############################################################################################################################################
+
         # '1' for jax_reg_wardi, '2' for jax_optim_wardi, '3' for jax_pred_jac_only, '4' for linear predictor normal,
         # '5' for linear predictor with jax, '6' for flat wardi normal, '7' for flat wardi with jax
-        self.ctrl_type = 7
+        self.ctrl_type = int(input("Enter the control type: 1 for jax_reg_wardi, 2 for jax_optim_wardi, 3 for jax_pred_jac_only, 4 for linear predictor normal, 5 for linear predictor with jax, 6 for flat wardi normal, 7 for flat wardi with jax: "))
+
+        first_thrust = self.MASS * self.GRAVITY # Initialize first input for hover at origin
         STATE = jnp.array([[0., 0., 0., 0., 0., 0., 0., 0., 0.]]).T
         INPUT = jnp.array([[self.MASS * self.GRAVITY, 0., 0., 0.]]).T
         ref = np.array([[0, 0, -0.8, 0]]).T
@@ -202,14 +203,43 @@ class OffboardControl(Node):
         print(f"here - self.u0: {self.u0}\n")
         # print(f'hiii')
         # exit(0)
-###############################################################################################################################################
         self.use_quat_yaw = True
+
+###############################################################################################################################################
+        
+        # Choose which trajectory function to use
+        self.main_traj = self.circle_horz_ref_func
+        # self.main_traj = self.circle_vert_ref_func
+        # self.main_traj = self.fig8_horz_ref_func
+        # self.main_traj = self.fig8_vert_ref_func_short
+        # self.main_traj = self.fig8_vert_ref_func_tall
+        # self.main_traj = self.helix
+        # self.main_traj = self.helix_spin
+        # self.main_traj = self.triangle
+        # self.main_traj = self.sawtooth
+
+        # Reverse lookup dictionary (function reference → name string)
+        trajectory_dictionary = {
+            self.circle_horz_ref_func: "circle_horz_ref_func",
+            self.circle_vert_ref_func: "circle_vert_ref_func",
+            self.fig8_horz_ref_func: "fig8_horz_ref_func",
+            self.fig8_vert_ref_func_short: "fig8_vert_ref_func_short",
+            self.fig8_vert_ref_func_tall: "fig8_vert_ref_func_tall",
+            self.helix: "helix",
+            self.helix_spin: "helix_spin",
+            self.triangle: "triangle",
+            self.sawtooth: "sawtooth"
+        }
+
+        # Lookup the function name based on the function reference
+        main_traj_name = trajectory_dictionary[self.main_traj]
+        print(f"Selected trajectory: {main_traj_name}")  # Should print: "Selected trajectory: circle_horz_ref_func"
         self.metadata = np.array(['Sim' if self.sim else 'Hardware',
                                   'jax_reg_wardi' if self.ctrl_type == 1 else 'jax_optim_wardi' if self.ctrl_type == 2 else 'jax_pred_jac_only' if self.ctrl_type == 3 else 'linear predictor' if self.ctrl_type == 4 else 'linear predictor with jax' if self.ctrl_type == 5 else 'flat wardi normal' if self.ctrl_type == 6 else 'flat wardi with jax' if self.ctrl_type == 7 else 'Unknown',
                                   '2x Speed' if self.double_speed else '1x Speed',
-                                  'QuatYawError' if self.use_quat_yaw else 'EulerYawError',
+                                  main_traj_name
                                   ])
-        
+        print(f"{self.main_traj() = }")                   
         # exit(1)
 ###############################################################################################################################################
 
@@ -538,23 +568,13 @@ class OffboardControl(Node):
 
 #~~~~~~~~~~~~~~~ Calculate reference trajectory ~~~~~~~~~~~~~~~
         if self.time_from_start <= self.cushion_time:
-            reffunc = self.hover_ref_func(2)
+            reffunc = self.hover_ref_func(1)
         elif self.cushion_time < self.time_from_start < self.cushion_time + self.flight_time:
-            reffunc = self.circle_horz_ref_func()
-            # reffunc = self.circle_horz_spin_ref_func()
-            # reffunc = self.circle_vert_ref_func()
-            # reffunc = self.fig8_horz_ref_func()
-            # reffunc = self.fig8_vert_ref_func_short()
-            # reffunc = self.fig8_vert_ref_func_tall()
-            # reffunc = self.helix()
-            # reffunc = self.helix_spin()
-            # reffunc = self.triangle()
-            # reffunc = self.sawtooth()
+            reffunc = self.main_traj()
         elif self.cushion_time + self.flight_time <= self.time_from_start <= self.time_before_land:
             reffunc = self.hover_ref_func(1)
         else:
             reffunc = self.hover_ref_func(1)
-        # reffunc = np.array([[0., 0., -10., 0.]]).T
         print(f"reffunc: {reffunc}")
 
         # Calculate the Newton-Rapshon control input and transform the force into a throttle command for publishing to the vehicle

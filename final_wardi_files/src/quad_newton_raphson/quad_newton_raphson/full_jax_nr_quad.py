@@ -50,6 +50,7 @@ from transforms3d.euler import quat2euler
 from pyJoules.handler.csv_handler import CSVHandler
 from pyJoules.device.rapl_device import RaplPackageDomain, RaplCoreDomain
 from pyJoules.energy_meter import EnergyContext
+from scipy.spatial.transform import Rotation as R
 
 import sys
 import traceback
@@ -62,6 +63,13 @@ class OffboardControl(Node):
         self.mocap_k = -1
         self.full_rotations = 0
         self.made_it = 0
+
+        # test = [-0.7993715405464172, -0.5975781679153442, 0.03904560208320618, 0.04879523441195488]
+        # self.roll, self.pitch, yaw = self.xeuler_from_quaternion(*test)
+        # print(f"{self.roll = }")
+        # print(f"{self.pitch = }")
+        # print(f"{yaw = }")
+        # exit(0)
 ###############################################################################################################################################
 
         # Figure out if in simulation or hardware mode to set important variables to the appropriate values
@@ -126,8 +134,8 @@ class OffboardControl(Node):
 ###############################################################################################################################################
 
         # Initialize variables:
-        self.cushion_time = 4.0
-        self.flight_time = 20.0
+        self.cushion_time = 8.0
+        self.flight_time = 30.0
         self.time_before_land = self.flight_time + 2*(self.cushion_time)
         print(f"time_before_land: {self.time_before_land}")
         self.offboard_setpoint_counter = 0 #helps us count 10 cycles of sending offboard heartbeat before switching to offboard mode and arming
@@ -206,9 +214,10 @@ class OffboardControl(Node):
         self.use_quat_yaw = True
 
 ###############################################################################################################################################
-        
-        # Choose which trajectory function to use
-        self.main_traj = self.circle_horz_ref_func
+    
+        # self.main_traj = self.hover_ref_func
+        # self.main_traj = self.circle_horz_ref_func
+        self.main_traj = self.circle_horz_spin_ref_func
         # self.main_traj = self.circle_vert_ref_func
         # self.main_traj = self.fig8_horz_ref_func
         # self.main_traj = self.fig8_vert_ref_func_short
@@ -218,9 +227,11 @@ class OffboardControl(Node):
         # self.main_traj = self.triangle
         # self.main_traj = self.sawtooth
 
+
         # Reverse lookup dictionary (function reference → name string)
-        trajectory_dictionary = {
+        self.trajectory_dictionary = {
             self.circle_horz_ref_func: "circle_horz_ref_func",
+            self.circle_horz_spin_ref_func: "circle_horz_spin_ref_func",
             self.circle_vert_ref_func: "circle_vert_ref_func",
             self.fig8_horz_ref_func: "fig8_horz_ref_func",
             self.fig8_vert_ref_func_short: "fig8_vert_ref_func_short",
@@ -228,18 +239,19 @@ class OffboardControl(Node):
             self.helix: "helix",
             self.helix_spin: "helix_spin",
             self.triangle: "triangle",
-            self.sawtooth: "sawtooth"
+            self.sawtooth: "sawtooth",
+            self.hover_ref_func: "hover"
         }
 
-        # Lookup the function name based on the function reference
-        main_traj_name = trajectory_dictionary[self.main_traj]
-        print(f"Selected trajectory: {main_traj_name}")  # Should print: "Selected trajectory: circle_horz_ref_func"
+        self.main_traj_name = self.trajectory_dictionary[self.main_traj]
+        print(f"Selected trajectory: {self.main_traj_name}")  # Should print: "Selected trajectory: circle_horz_ref_func"
+
+
         self.metadata = np.array(['Sim' if self.sim else 'Hardware',
                                   'jax_reg_wardi' if self.ctrl_type == 1 else 'jax_optim_wardi' if self.ctrl_type == 2 else 'jax_pred_jac_only' if self.ctrl_type == 3 else 'linear predictor' if self.ctrl_type == 4 else 'linear predictor with jax' if self.ctrl_type == 5 else 'flat wardi normal' if self.ctrl_type == 6 else 'flat wardi with jax' if self.ctrl_type == 7 else 'Unknown',
                                   '2x Speed' if self.double_speed else '1x Speed',
-                                  main_traj_name
+                                  self.main_traj_name
                                   ])
-        print(f"{self.main_traj() = }")                   
         # exit(1)
 ###############################################################################################################################################
 
@@ -435,11 +447,22 @@ class OffboardControl(Node):
         self.vy = msg.velocity[1]
         self.vz = msg.velocity[2]
 
-        # print(f"{msg.q = }")
+
+
+        quat = msg.q.tolist()
+        quat_xyzw = quat[1:] + [quat[0]]         # Convert to (x, y, z, w) format
+        self.quat = quat_xyzw
+        print(f"{self.quat = }")
+        self.ROT = R.from_quat(quat_xyzw).as_matrix()
+        print(f"{self.ROT = }")
+        # exit(0)
         # self.roll, self.pitch, yaw = quat2euler(msg.q)
         self.roll, self.pitch, yaw = self.xeuler_from_quaternion(*msg.q)
         # self.roll, self.pitch, yaw = self.euler_from_quaternion(msg.q)
         self.yaw = self.adjust_yaw(yaw)
+
+        # print(f"{(self.roll, self.pitch, self.yaw) = }")
+        # exit(0)
 
         self.p = msg.angular_velocity[0]
         self.q = msg.angular_velocity[1]
@@ -465,10 +488,10 @@ class OffboardControl(Node):
         msg.thrust_body[1] = 0.0
         msg.thrust_body[2] = -1* float(thrust)
 
-        print(f"{msg.thrust_body = }")
-        print(f"{msg.roll = }")
-        print(f"{msg.pitch = }")
-        print(f"{msg.yaw = }")
+        # print(f"{msg.thrust_body = }")
+        # print(f"{msg.roll = }")
+        # print(f"{msg.pitch = }")
+        # print(f"{msg.yaw = }")
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.rates_setpoint_publisher.publish(msg)
         
@@ -509,12 +532,14 @@ class OffboardControl(Node):
 
     def newton_raphson_timer_callback(self) -> None: # ~~This is the main function that runs at 100Hz and Administrates Calls to Every Other Function ~~
         """Newton-Raphson Callback Function for The 100Hz Timer."""
-        # print("NR_Callback")
+        print("NR_Callback")
+        print(f"{self.offboard_mode_rc_switch_on = }")
         if self.offboard_mode_rc_switch_on: #integration of RC 'killswitch' for offboard deciding whether to send heartbeat signal, engage offboard, and arm
             # self.time_from_start = time.time()-self.T0 #update curent time from start of program for reference trajectories and for switching between NR and landing mode
             
             print(f"--------------------------------------")
-            # print(self.vehicle_status.nav_state)
+            print(f"{self.vehicle_status.nav_state = }")
+            print(f"{VehicleStatus.NAVIGATION_STATE_OFFBOARD = }")
             if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                 print("IN OFFBOARD MODE")
                 print(f"NR_callback- timefromstart: {self.time_from_start}")
@@ -570,7 +595,7 @@ class OffboardControl(Node):
         if self.time_from_start <= self.cushion_time:
             reffunc = self.hover_ref_func(1)
         elif self.cushion_time < self.time_from_start < self.cushion_time + self.flight_time:
-            reffunc = self.main_traj()
+            reffunc = self.main_traj(1) if self.main_traj == self.hover_ref_func else self.main_traj()
         elif self.cushion_time + self.flight_time <= self.time_from_start <= self.time_before_land:
             reffunc = self.hover_ref_func(1)
         else:
@@ -947,8 +972,11 @@ class OffboardControl(Node):
 
         b3 = accels / np.linalg.norm(accels)
         # print(f"{b3 = }")
-        e1 = np.array([[1., 0., 0.]]).T
+        # e1 = np.array([[1., 0., 0.]]).T
+        e1 = np.cos(curr_yaw) * a1 + np.sin(curr_yaw) * a2
         # print(f"{e1 = }")
+        # print(f"{e1n = }")
+        # exit(0)
         val2 = np.cross(b3, e1, axis=0)
         # print(f"{val2 = }")
         b2 = val2 / np.linalg.norm(val2)
@@ -967,9 +995,49 @@ class OffboardControl(Node):
         # print(f"{b2.T @ ((MASS / thrust) * val3) = }")
         p = (b2.T @ ((self.MASS/-clipped_thrust) * val3)).item()
         q = (b1.T @ ((self.MASS/-clipped_thrust) * val3)).item()
-        yaw_err = self.shortest_path_yaw_quaternion(curr_yaw, ref[3][0].item())
-        print(f"{yaw_err = }")
-        r = yaw_err * 0.5
+        # yaw_err = self.shortest_path_yaw_quaternion(curr_yaw, ref[3][0].item())
+        # print(f"{yaw_err = }")
+        # r = curr_yawdot + (yaw_err * step)
+
+        # print(f"{ref[3][0].item() = }")
+        # print(f"{curr_yaw = }")
+        # print(f"{yaw_err = }")
+        # print(f"{r = }")
+        # exit(0)
+        # Define matrices A and B
+        A = np.hstack((e1, b2, a3))
+        B = self.ROT
+
+        # Define known values in x and y
+        x_known = np.array([ref[3][0].item()])
+        y_known = np.array([p, q])  # y1 = 4, y2 = 2
+
+        print(f"{x_known = }")
+        print(f"{y_known = }")
+        print(f"{x_known.shape = }")
+        print(f"{y_known.shape = }")
+        # exit(0)
+
+        # Split A into parts affecting unknowns (A1) and knowns (A2)
+        A1 = A[:, :2]  # First two columns (unknown x1, x2)
+        A2 = A[:, 2:]  # Last column (known x3)
+
+        # Split B into parts affecting unknowns (B1) and knowns (B2)
+        B1 = B[:, 2:]  # Last column (unknown y3)
+        B2 = B[:, :2]  # First two columns (known y1, y2)
+
+        # Compute right-hand side
+        rhs = (B2 @ y_known) - (A2 @ x_known)  # Move known values to RHS
+
+        # Solve system for [x1, x2, y3]
+        M = np.hstack((A1, -B1))  # Construct coefficient matrix
+        unknowns = np.linalg.solve(M, rhs)  # Solve for unknowns
+
+        # Extract solutions
+        x1, x2, r = unknowns
+        r = -r
+        print(f"{r = }")
+
         max_rate = 0.8
         r = np.clip(r, -max_rate, max_rate)
         p = np.clip(p, -max_rate, max_rate)
@@ -977,6 +1045,10 @@ class OffboardControl(Node):
         # print(f"{p = }, {q = }, {r = }")
         u = np.array([[clipped_thrust, p, q, r]]).T
         # print(f"{u = }")
+        print(f"{e1 = }")
+        print(f"{b2 = }")
+        print(f"{a3 = }")
+
         return u, x_df
 
     def observer_matrix(self): #Calculates Observer Matrix for Prediction of desired outputs from all 9 states
@@ -1100,7 +1172,7 @@ class OffboardControl(Node):
 
         w = 2*m.pi / PERIOD
 
-        SPIN_PERIOD = 10
+        SPIN_PERIOD = 20
         yaw_ref = (t) / (SPIN_PERIOD / (2*m.pi))
 
         r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -0.7, yaw_ref ]]).T
@@ -1211,7 +1283,7 @@ class OffboardControl(Node):
         z0 = 0.8
         height_variance = 0.3
 
-        SPIN_PERIOD = 15
+        SPIN_PERIOD = 20
         yaw_ref = (t) / (SPIN_PERIOD / (2*m.pi))
 
         r = np.array([[.6*m.cos(w*t), .6*m.sin(w*t), -1*(z0 + height_variance * m.sin(w_z * t)), yaw_ref]]).T
@@ -1224,7 +1296,7 @@ class OffboardControl(Node):
         t_traj = self.time_from_start - self.cushion_time
         t = t_traj + self.T_LOOKAHEAD
 
-        SPIN_PERIOD = 15
+        SPIN_PERIOD = 20
         
         yaw_ref = (t) / (SPIN_PERIOD / (2*m.pi))
         r = np.array([[0., 0., -0.5, yaw_ref]]).T

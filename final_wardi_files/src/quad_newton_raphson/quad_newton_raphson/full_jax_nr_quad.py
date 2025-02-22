@@ -204,9 +204,11 @@ class OffboardControl(Node):
             self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
         elif self.ctrl_type == 6:
             print("Using flat wardi normal")
+            self.last_yaw_ref = 0.
             self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
         elif self.ctrl_type == 7:
             print("Using flat wardi with jax")
+            self.last_yaw_ref = 0.
             self.u0 = np.array([[self.get_throttle_command_from_force(first_thrust), 0., 0., 0.]]).T
         print(f"here - self.u0: {self.u0}\n")
         # print(f'hiii')
@@ -217,12 +219,12 @@ class OffboardControl(Node):
     
         # self.main_traj = self.hover_ref_func
         # self.main_traj = self.circle_horz_ref_func
-        self.main_traj = self.circle_horz_spin_ref_func
+        # self.main_traj = self.circle_horz_spin_ref_func
         # self.main_traj = self.circle_vert_ref_func
         # self.main_traj = self.fig8_horz_ref_func
         # self.main_traj = self.fig8_vert_ref_func_short
         # self.main_traj = self.fig8_vert_ref_func_tall
-        # self.main_traj = self.helix
+        self.main_traj = self.helix
         # self.main_traj = self.helix_spin
         # self.main_traj = self.triangle
         # self.main_traj = self.sawtooth
@@ -890,7 +892,11 @@ class OffboardControl(Node):
             return u
         elif self.ctrl_type == 7:
             print(f"Using Differentially Flat System for Wardi in Jax")
-            u, self.x_df = NR_tracker_flat(STATE, INPUT, self.x_df, ref, self.T_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS)
+            # curr_yaw = STATE[-1][0]
+            curr_yaw_ref = ref[3][0].item()
+            yaw_dot = (curr_yaw_ref - self.last_yaw_ref) / self.newton_raphson_timer_period
+            self.last_yaw_ref = curr_yaw_ref
+            u, self.x_df = NR_tracker_flat(STATE, INPUT, self.x_df, ref, self.T_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS, self.ROT, yaw_dot)
             # clipped_thrust, p, q, r, x_df = NR_tracker_flat(STATE, INPUT, self.x_df, ref, self.T_LOOKAHEAD, self.INTEGRATION_STEP, self.MASS)
             # print(f"{clipped_thrust = }")
             # print(f"{p = }")
@@ -1009,7 +1015,13 @@ class OffboardControl(Node):
         B = self.ROT
 
         # Define known values in x and y
-        x_known = np.array([ref[3][0].item()])
+
+        curr_yaw_ref = ref[3][0].item()
+        # yaw_dot = (curr_yaw_ref - curr_yaw)
+        yaw_dot = (curr_yaw_ref - self.last_yaw_ref) / step
+        x_known = np.array([yaw_dot])
+        self.last_yaw_ref = curr_yaw_ref
+
         y_known = np.array([p, q])  # y1 = 4, y2 = 2
 
         print(f"{x_known = }")
@@ -1119,10 +1131,10 @@ class OffboardControl(Node):
     def hover_ref_func(self, num): #Returns Constant Hover Reference Trajectories At A Few Different Positions ([x,y,z,yaw])
         """ Returns constant hover reference trajectories at a few different positions. """
         hover_dict = {
-            1: np.array([[0.0, 0.0, -0.6, self.yaw]]).T,
-            2: np.array([[0.0, 0.8, -0.8, self.yaw]]).T,
-            3: np.array([[0.8, 0.0, -0.8, self.yaw]]).T,
-            4: np.array([[0.8, 0.8, -0.8, self.yaw]]).T,
+            1: np.array([[0.0, 0.0, -0.6, 0.]]).T,
+            2: np.array([[0.0, 0.8, -0.8, 0.]]).T,
+            3: np.array([[0.8, 0.0, -0.8, 0.]]).T,
+            4: np.array([[0.8, 0.8, -0.8, 0.]]).T,
             5: np.array([[0.0, 0.0, -10.0, 0.0]]).T,
             6: np.array([[1.0, 1.0, -4.0, 0.0]]).T,
             7: np.array([[3.0, 4.0, -5.0, 0.0]]).T,

@@ -8,11 +8,21 @@ C = jnp.array([[1, 0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 1, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0, 1]])
 
-@jit
+
+
+# @jit
 def dynamics(state, input, mass):
     """Quadrotor dynamics. xdot = f(x, u)."""
+    print("hio")
     x, y, z, vx, vy, vz, roll, pitch, yaw = state
-    curr_thrust, curr_rolldot, curr_pitchdot, curr_yawdot = input
+    curr_thrust = input[0]
+    body_rates = input[1:]
+    T = jnp.array([[jnp.array([1]), jnp.sin(roll) * jnp.tan(pitch), jnp.cos(roll) * jnp.tan(pitch)],
+                    [jnp.array([0]), jnp.cos(roll), -jnp.sin(roll)],
+                    [jnp.array([0]), jnp.sin(roll) / jnp.cos(pitch), jnp.cos(roll) / jnp.cos(pitch)]]).squeeze()
+
+    # T = jnp.eye(3)
+    curr_rolldot, curr_pitchdot, curr_yawdot = T @ body_rates
 
     sr = jnp.sin(roll)
     sy = jnp.sin(yaw)
@@ -28,7 +38,7 @@ def dynamics(state, input, mass):
     xdot = jnp.array([vx, vy, vz, vxdot, vydot, vzdot, curr_rolldot, curr_pitchdot, curr_yawdot]).reshape((9,1))
     return xdot
 
-@jit
+# @jit
 def fwd_euler(state, input, lookahead_step, integrations_int, mass):
     """Forward Euler integration."""
     def for_function(i, current_state):
@@ -37,32 +47,33 @@ def fwd_euler(state, input, lookahead_step, integrations_int, mass):
     pred_state = lax.fori_loop(0, integrations_int, for_function, state)
     return pred_state
 
-@jit
+# @jit
 def predict_state(state, u, T_lookahead, lookahead_step, mass):
     """Predict the next state at time t+T via fwd euler integration of nonlinear dynamics."""
     integrations_int = (T_lookahead / lookahead_step).astype(int)
+    # integrations_int = int(T_lookahead / lookahead_step)
     pred_state = fwd_euler(state, u, lookahead_step, integrations_int, mass)
     return pred_state
 
-@jit
+# @jit
 def predict_output(state, u, T_lookahead, lookahead_step, mass):
     """Take output from the predicted states."""
     pred_state = predict_state(state, u, T_lookahead, lookahead_step, mass)
     return C @ pred_state
 
-@jit
+# @jit
 def get_jac_pred_u(state, last_input, T_lookahead, lookahead_step, mass):
     """Get the jacobian of the predicted output with respect to the control input."""
     raw_val = jacfwd(predict_output, 1)(state, last_input, T_lookahead, lookahead_step, mass)
     return raw_val.reshape((4,4))
 
-@jit
+# @jit
 def get_inv_jac_pred_u(state, last_input, T_lookahead, lookahead_step, mass):
     """Get the inverse of the jacobian of the predicted output with respect to the control input."""
     return jnp.linalg.pinv(get_jac_pred_u(state, last_input, T_lookahead, lookahead_step, mass).reshape((4,4)))
 
 
-@jit
+# @jit
 def execute_cbf(current, phi, max_value, min_value, gamma):
     """Execute the control barrier function."""
     zeta_max = gamma * (max_value - current) - phi
@@ -70,7 +81,7 @@ def execute_cbf(current, phi, max_value, min_value, gamma):
     v = jnp.where(current >= 0, jnp.minimum(0, zeta_max), jnp.maximum(0, zeta_min))
     return v
 
-@jit
+# @jit
 def integral_cbf(last_input, phi):
     """Integral control barrier function set-up for all inputs."""
     # Extract values from input
@@ -215,7 +226,7 @@ def NR_tracker_linpred(currstate, currinput, ref, integration_step, mass, eAT, i
 
 
 @jit
-def NR_tracker_flat(STATE, INPUT, x_df, ref, T_LOOKAHEAD, step, MASS):
+def NR_tracker_flat(STATE, INPUT, x_df, ref, T_LOOKAHEAD, step, MASS, ROT, yaw_dot):
     curr_x, curr_y, curr_z, curr_yaw = STATE[0][0], STATE[1][0], STATE[2][0], STATE[-1][0]
     curr_vx, curr_vy, curr_vz = STATE[3][0], STATE[4][0], STATE[5][0]
     curr_yawdot = INPUT[3][0]
@@ -252,7 +263,10 @@ def NR_tracker_flat(STATE, INPUT, x_df, ref, T_LOOKAHEAD, step, MASS):
     sigmad2 = x_df[8:12]
     sigmad3 = u_df
 
+    a1 = jnp.array([[1,0,0]]).T
+    a2 = jnp.array([[0,1,0]]).T
     a3 = jnp.array([[0, 0, -1]]).T
+
     accels = sigmad2[0:3] + GRAVITY * a3
     thrust = MASS * jnp.linalg.norm(accels)
     
@@ -261,7 +275,9 @@ def NR_tracker_flat(STATE, INPUT, x_df, ref, T_LOOKAHEAD, step, MASS):
     clipped_thrust = jnp.clip(thrust, thrust_min, thrust_max)
     
     b3 = accels / jnp.linalg.norm(accels)
-    e1 = jnp.array([[1., 0., 0.]]).T
+
+
+    e1 = jnp.cos(curr_yaw) * a1 + jnp.sin(curr_yaw) * a2
     val2 = jnp.cross(b3, e1, axis=0)
     b2 = val2 / jnp.linalg.norm(val2)
     b1 = jnp.cross(b2, b3, axis=0)
@@ -271,8 +287,43 @@ def NR_tracker_flat(STATE, INPUT, x_df, ref, T_LOOKAHEAD, step, MASS):
 
     p = (b2.T @ ((MASS / -clipped_thrust) * val3))#.item()
     q = (b1.T @ ((MASS / -clipped_thrust) * val3))#.item()
-    yaw_err = shortest_path_yaw_quaternion(curr_yaw, ref[3][0])#.item())
-    r = yaw_err * 0.5
+
+    A = jnp.hstack((e1, b2, a3))
+    B = ROT
+
+    # Define known values in x and y
+    # x_known = jnp.array([ref[3][0]])
+    x_known = jnp.array([yaw_dot])
+
+    y_known = jnp.array([p[0][0], q[0][0]])  # y1 = 4, y2 = 2
+
+    # print(f"{x_known = }")
+    # print(f"{y_known = }")
+    # print(f"{x_known.shape = }")
+    # print(f"{y_known.shape = }")
+    # exit(0)
+
+    # Split A into parts affecting unknowns (A1) and knowns (A2)
+    A1 = A[:, :2]  # First two columns (unknown x1, x2)
+    A2 = A[:, 2:]  # Last column (known x3)
+
+    # Split B into parts affecting unknowns (B1) and knowns (B2)
+    B1 = B[:, 2:]  # Last column (unknown y3)
+    B2 = B[:, :2]  # First two columns (known y1, y2)
+
+    # Compute right-hand side
+    rhs = (B2 @ y_known) - (A2 @ x_known)  # Move known values to RHS
+
+    # Solve system for [x1, x2, y3]
+    M = jnp.hstack((A1, -B1))  # Construct coefficient matrix
+    unknowns = jnp.linalg.solve(M, rhs)  # Solve for unknowns
+
+    # Extract solutions
+    x1, x2, r = unknowns
+    r = -r
+    print(f"{r = }")
+
+
 
     max_rate = 0.8
     p = jnp.clip(p, -max_rate, max_rate)

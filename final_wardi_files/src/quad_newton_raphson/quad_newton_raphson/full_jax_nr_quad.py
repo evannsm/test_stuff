@@ -71,7 +71,7 @@ class OffboardControl(Node):
         # print(f"{yaw = }")
         # exit(0)
 ###############################################################################################################################################
-
+        self.flat_normal = True
         # Figure out if in simulation or hardware mode to set important variables to the appropriate values
         self.sim = bool(int(input("Are you using the simulator? Write 1 for Sim and 0 for Hardware: ")))
         print(f"{'SIMULATION' if self.sim else 'HARDWARE'}")
@@ -134,8 +134,8 @@ class OffboardControl(Node):
 ###############################################################################################################################################
 
         # Initialize variables:
-        self.cushion_time = 8.0
-        self.flight_time = 30.0
+        self.cushion_time = 3.0
+        self.flight_time = 20.0
         self.time_before_land = self.flight_time + 2*(self.cushion_time)
         print(f"time_before_land: {self.time_before_land}")
         self.offboard_setpoint_counter = 0 #helps us count 10 cycles of sending offboard heartbeat before switching to offboard mode and arming
@@ -218,13 +218,13 @@ class OffboardControl(Node):
 ###############################################################################################################################################
     
         # self.main_traj = self.hover_ref_func
-        # self.main_traj = self.circle_horz_ref_func
+        self.main_traj = self.circle_horz_ref_func
         # self.main_traj = self.circle_horz_spin_ref_func
         # self.main_traj = self.circle_vert_ref_func
         # self.main_traj = self.fig8_horz_ref_func
         # self.main_traj = self.fig8_vert_ref_func_short
         # self.main_traj = self.fig8_vert_ref_func_tall
-        self.main_traj = self.helix
+        # self.main_traj = self.helix
         # self.main_traj = self.helix_spin
         # self.main_traj = self.triangle
         # self.main_traj = self.sawtooth
@@ -474,8 +474,12 @@ class OffboardControl(Node):
         self.nr_state = np.array([[self.x, self.y, self.z, self.yaw]]).T
 
         if self.first_iteration:
-            self.x_df = np.array([[self.x, self.y, self.z, self.yaw, self.vx, self.vy, self.vz, 0., 0., 0., 0., 0.]]).T
+            if self.flat_normal:
+                self.x_df = np.array([[self.x, self.y, self.z, self.yaw, self.vx, self.vy, self.vz, 0., 0., 0., 0., 0.]]).T
+            else:
+                self.x_df = np.array([[self.x, self.y, self.z, self.yaw, self.vx, self.vy, self.vz, 0., 0., 0., 0., 0., 0., 0., 0., 0.]]).T
             print(f"First iteration: set initial flat state as {self.x_df = }")
+            # print(f"{self.x_df.shape = }")
             # exit(0)
         # print(f"State Vector: {self.state_vector}")
         # print(f"NR State: {self.nr_state}")
@@ -920,43 +924,94 @@ class OffboardControl(Node):
         T_lookahead = self.T_LOOKAHEAD
         step = self.newton_raphson_timer_period
 
-        z1 = np.array([[curr_x, curr_y, curr_z, curr_yaw]]).T
-        z2 = np.array([[curr_vx, curr_vy, curr_vz, curr_yawdot]]).T
-        z3 = x_df[8:12]
-        # print(f"{z1 = }")
-        # print(f"{z2 = }")
-        # print(f"{z3 = }")
+        flat_normal = self.flat_normal
 
-        dgdu_inv = (2/T_lookahead**2) * np.eye(4)
-        alpha = np.array([[20,30,30,30]]).T
-        pred = z1 + z2*T_lookahead + (1/2)*z3*T_lookahead**2
-        # print(f"{pred = }")
-        # print(f"{ref = }")
-        error = self.get_tracking_error(ref, pred)
-        # print(f"{error = }")
-        NR = dgdu_inv @ error
-        u_df = alpha * NR
-        self.u_df = u_df
-        # print(f"{u_df = }")
+        if flat_normal:
+            z1 = np.array([[curr_x, curr_y, curr_z, curr_yaw]]).T # position 
+            z2 = np.array([[curr_vx, curr_vy, curr_vz, curr_yawdot]]).T # velocity
+            z3 = x_df[8:12] #acceleration
+            print(f"{z1 = }")
+            print(f"{z2 = }")
+            print(f"{z3 = }")
 
-        A_df = np.block([
-                    [np.zeros((4,4)), np.eye(4), np.zeros((4,4))],
-                    [np.zeros((4,4)), np.zeros((4,4)), np.eye(4)],
-                    [np.zeros((4,4)), np.zeros((4,4)), np.zeros((4,4))]
-                    ])
+            dgdu_inv = (2/T_lookahead**2) * np.eye(4)
+            alpha = np.array([[20,30,30,30]]).T
+            pred = z1 + z2*T_lookahead + (1/2)*z3*T_lookahead**2
+            # print(f"{pred = }")
+            # print(f"{ref = }")
+            error = self.get_tracking_error(ref, pred)
+            # print(f"{error = }")
+            NR = dgdu_inv @ error
+            u_df = alpha * NR
+            self.u_df = u_df
+            # print(f"{u_df = }")
+
+            A_df = np.block([
+                        [np.zeros((4,4)), np.eye(4), np.zeros((4,4))],
+                        [np.zeros((4,4)), np.zeros((4,4)), np.eye(4)],
+                        [np.zeros((4,4)), np.zeros((4,4)), np.zeros((4,4))]
+                        ])
+            
+            B_df = np.block([
+                        [np.zeros((4,4))],
+                        [np.zeros((4,4))],
+                        [np.eye(4)]
+                        ])
+            x_dot_df = A_df @ x_df + B_df @ u_df
+            x_df = x_df + x_dot_df * step
+            # print(f"{self.x_df[4:] = }")
+            sigma = x_df[0:4]
+            sigmad1 = x_df[4:8]
+            sigmad2 = x_df[8:12]
+            sigmad3 = u_df
+
+        else:
+            z1 = np.array([[curr_x, curr_y, curr_z, curr_yaw]]).T # position 
+            z2 = np.array([[curr_vx, curr_vy, curr_vz, curr_yawdot]]).T # velocity
+            z3 = x_df[8:12] #acceleration
+            z4 = x_df[12:] #jerk
+            print(f"{z1 = }")
+            print(f"{z2 = }")
+            print(f"{z3 = }")
+            print(f"{z4 = }")
+
+            dgdu_inv = (6/T_lookahead**3) * np.eye(4)
+            alpha = np.array([[20,30,30,30]]).T
+            pred = z1 + z2*T_lookahead + (1/2)*z3*T_lookahead**2 + (1/6)*z4*T_lookahead**3
+            # print(f"{pred = }")
+            # print(f"{ref = }")
+            error = self.get_tracking_error(ref, pred)
+            # print(f"{error = }")
+            NR = dgdu_inv @ error
+            u_df = alpha * NR
+            self.u_df = u_df
+            # print(f"{u_df = }")
+
+            A_df = np.block([
+                        [np.zeros((4,4)), np.eye(4), np.zeros((4,4)), np.zeros((4,4))],
+                        [np.zeros((4,4)), np.zeros((4,4)), np.eye(4), np.zeros((4,4))],
+                        [np.zeros((4,4)), np.zeros((4,4)), np.zeros((4,4)), np.eye(4)],
+                        [np.zeros((4,4)), np.zeros((4,4)), np.zeros((4,4)), np.zeros((4,4))]
+                        ])
+
+            B_df = np.block([
+                        [np.zeros((4,4))],
+                        [np.zeros((4,4))],
+                        [np.zeros((4,4))],
+                        [np.eye(4)]
+                        ])  
+            x_dot_df = A_df @ x_df + B_df @ u_df
+            x_df = x_df + x_dot_df * step
+            # print(f"{self.x_df[4:] = }")
+            sigma = x_df[0:4]
+            sigmad1 = x_df[4:8]
+            sigmad2 = x_df[8:12]
+            sigmad3 = x_df[12:]
+            sigmad4 = u_df
         
-        B_df = np.block([
-                    [np.zeros((4,4))],
-                    [np.zeros((4,4))],
-                    [np.eye(4)]
-                    ])
-        x_dot_df = A_df @ x_df + B_df @ u_df
-        x_df = x_df + x_dot_df * step
-        # print(f"{self.x_df[4:] = }")
-        sigma = x_df[0:4]
-        sigmad1 = x_df[4:8]
-        sigmad2 = x_df[8:12]
-        sigmad3 = u_df
+
+
+
 
         a1 = np.array([[1,0,0]]).T
         a2 = np.array([[0,1,0]]).T

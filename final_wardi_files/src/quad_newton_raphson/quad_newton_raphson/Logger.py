@@ -6,8 +6,17 @@ class Logger:
 
     def __init__(self, filename):
         self.filename = filename[0]
-        base_path = os.path.dirname(os.path.abspath(__file__))        # Get the directory where the script is located
-        base_path = os.path.join(base_path, 'data_analysis')
+        # base_path = os.path.dirname(os.path.abspath(__file__))        # Get the directory where the script is located
+        # base_path = os.path.join(base_path, 'data_analysis')
+
+
+        base_path = os.path.dirname(os.path.abspath(__file__))  # Get the script's directory
+        # base_path = os.path.abspath(os.path.join(base_path, ".."))  # A way to go up one level
+        base_path = os.path.join(base_path, 'data_analysis/') # Append the 'data_analysis' folder to the path
+        parts = base_path.split(os.sep)        # Split the path into components
+        parts = ["src" if part == "build" else part for part in parts]        # Replace 'build' with 'src' if it exists in the path
+        base_path = os.sep.join(parts)        # Reconstruct the new path
+
         print(f"logger {base_path = }")        # Print the base path
         self.filename = filename[0]        # Assuming 'filename' is passed or defined as a list
         self.full_path = os.path.join(base_path, self.filename)        # Combine the base path with the filename
